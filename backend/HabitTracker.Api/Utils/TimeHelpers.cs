@@ -15,7 +15,7 @@ public static class TimeHelpers
             return TimeZoneInfo.Local;
 
         try { return TimeZoneInfo.FindSystemTimeZoneById(ianaOrWindows); }
-        catch { /* ignore */ }
+        catch (Exception ex) { Console.WriteLine($"Failed to find timezone because {ex.Message}"); }
 
         if (IanaToWindows.TryGetValue(ianaOrWindows, out var win))
             return TimeZoneInfo.FindSystemTimeZoneById(win);
