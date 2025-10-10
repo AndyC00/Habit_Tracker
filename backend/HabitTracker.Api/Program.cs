@@ -9,7 +9,7 @@ using System.Text.Json.Serialization;
 // --------------------- Preliminary setup ---------------------
 var builder = WebApplication.CreateBuilder(args);
 
-// SQLite
+// using EFcore + SQLite for data storage
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlite(builder.Configuration.GetConnectionString("Default")
         ?? "Data Source=habittracker.db"));
@@ -21,6 +21,7 @@ builder.Services.ConfigureHttpJsonOptions(opt =>
     opt.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 });
 
+// for testing use
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddCors(opt =>
@@ -31,6 +32,7 @@ builder.Services.AddCors(opt =>
         .AllowAnyOrigin()); // for MVP only, need to be more restrictive in production version
 });
 
+// build app and middleware pipeline
 var app = builder.Build();
 
 app.UseCors();
@@ -43,10 +45,10 @@ if (app.Environment.IsDevelopment())
 app.MapGet("/ping", () => Results.Ok(new { ok = true })).WithTags("Health");
 
 
-// --------------------- logics for Create, Read, Update, Delete ---------------------
+// --------------------- using Minimal API for Create, Read, Update, Delete (CRUD) ---------------------
 app.MapGet("/api/habits", async (AppDbContext db, bool? includeArchived) =>
 {
-    var q = db.Habits.AsNoTracking().Where(h => h.UserId == 1);
+    var q = db.Habits.AsNoTracking().Where(h => h.UserId == 1); // only get userId=1 for MVP
     if (includeArchived != true) q = q.Where(h => !h.IsArchived);
     var list = await q.OrderBy(h => h.IsArchived).ThenBy(h => h.Id).ToListAsync();
     return Results.Ok(list);
@@ -54,7 +56,9 @@ app.MapGet("/api/habits", async (AppDbContext db, bool? includeArchived) =>
 
 app.MapPost("/api/habits", async (AppDbContext db, HabitCreateDto dto) =>
 {
-    if (string.IsNullOrWhiteSpace(dto.Name)) return Results.BadRequest("Name is required.");
+    if (string.IsNullOrWhiteSpace(dto.Name))
+        return Results.BadRequest("Name is required.");
+
     var habit = new Habit
     {
         Name = dto.Name.Trim(),
@@ -71,9 +75,11 @@ app.MapPost("/api/habits", async (AppDbContext db, HabitCreateDto dto) =>
 app.MapPut("/api/habits/{id:int}", async (AppDbContext db, int id, HabitUpdateDto dto) =>
 {
     var habit = await db.Habits.FindAsync(id);
-    if (habit is null || habit.UserId != 1) return Results.NotFound();
+    if (habit is null || habit.UserId != 1)     // only userId=1 for MVP
+        return Results.NotFound();
 
-    if (string.IsNullOrWhiteSpace(dto.Name)) return Results.BadRequest("Name is required.");
+    if (string.IsNullOrWhiteSpace(dto.Name)) 
+        return Results.BadRequest("Name is required.");
 
     habit.Name = dto.Name.Trim();
     habit.Description = dto.Description;
@@ -88,7 +94,9 @@ app.MapPut("/api/habits/{id:int}", async (AppDbContext db, int id, HabitUpdateDt
 app.MapPost("/api/habits/{id:int}/archive", async (AppDbContext db, int id) =>
 {
     var habit = await db.Habits.FindAsync(id);
-    if (habit is null || habit.UserId != 1) return Results.NotFound();
+    if (habit is null || habit.UserId != 1)     // only userId=1 for MVP
+        return Results.NotFound();
+
     habit.IsArchived = true;
     await db.SaveChangesAsync();
     return Results.NoContent();
@@ -97,7 +105,9 @@ app.MapPost("/api/habits/{id:int}/archive", async (AppDbContext db, int id) =>
 app.MapPost("/api/habits/{id:int}/unarchive", async (AppDbContext db, int id) =>
 {
     var habit = await db.Habits.FindAsync(id);
-    if (habit is null || habit.UserId != 1) return Results.NotFound();
+    if (habit is null || habit.UserId != 1)     // only userId=1 for MVP
+        return Results.NotFound();
+
     habit.IsArchived = false;
     await db.SaveChangesAsync();
     return Results.NoContent();
@@ -108,14 +118,14 @@ app.MapPost("/api/habits/{id:int}/unarchive", async (AppDbContext db, int id) =>
 app.MapPost("/api/habits/{id:int}/checkins", async (AppDbContext db, int id, CheckInUpsertDto dto) =>
 {
     var habit = await db.Habits.FindAsync(id);
-    if (habit is null || habit.UserId != 1) return Results.NotFound();
+    if (habit is null || habit.UserId != 1)     // only userId=1 for MVP
+        return Results.NotFound();
 
     if (!TimeHelpers.TryParseLocalDate(dto.LocalDate, out var localDate))
         return Results.BadRequest("Invalid LocalDate. Use yyyy-MM-dd.");
 
-    // get last 7 days only
     var todayLocal = TimeHelpers.LocalToday(dto.UserTimeZoneIana ?? "Pacific/Auckland");
-    if (localDate < todayLocal.AddDays(-7) || localDate > todayLocal)
+    if (localDate < todayLocal.AddDays(-7) || localDate > todayLocal)   // get last 7 days available for checkin only
         return Results.BadRequest($"Only last 7 days allowed (including today). Today={todayLocal:yyyy-MM-dd}");
 
     var check = await db.HabitCheckIns
@@ -188,7 +198,7 @@ app.MapGet("/api/habits/{id:int}/calendar", async (AppDbContext db, int id, stri
     return Results.Ok(result);
 });
 
-app.MapGet("/api/habits/{id:int}/stats", async (AppDbContext db, int id, string? month /* yyyy-MM 可空 */) =>
+app.MapGet("/api/habits/{id:int}/stats", async (AppDbContext db, int id, string? month) =>
 {
     var habit = await db.Habits.AsNoTracking().FirstOrDefaultAsync(h => h.Id == id && h.UserId == 1);
     if (habit is null) return Results.NotFound();
@@ -216,7 +226,7 @@ app.MapGet("/api/habits/{id:int}/stats", async (AppDbContext db, int id, string?
         if (prev is null || d == prev.Value.AddDays(1))
             current++;
         else if (d == prev)
-            current = current;
+            continue;   // same day check-in, ignore for now
         else
             current = 1;
 
