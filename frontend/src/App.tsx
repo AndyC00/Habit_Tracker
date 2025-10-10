@@ -1,19 +1,27 @@
 import { useEffect, useState } from "react"
 
+// ------------------ constants and types ------------------
 type Habit = {
-  id: number
-  name: string
-  description?: string
-  colorHex?: string
-  iconKey?: string
+  id: number,
+  name: string,
+  description?: string,
+  colorHex?: string,
+  iconKey?: string,
   isArchived: boolean
 }
-type CheckIn = { id: number; habitId: number; localDate: string; durationMinutes?: number }
+type CheckIn = {
+  id: number,
+  habitId: number,
+  localDate: string,
+  durationMinutes?: number
+}
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:5000"
-
+// ------------------ helper functions ------------------
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const base = import.meta.env.VITE_API_BASE as string;
+  if (!base) throw new Error("VITE_API_BASE in .env is not set");
+
+  const res = await fetch(`${base}${path}`, {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     ...init,
   })
@@ -29,19 +37,25 @@ function todayLocalISO(): string {
   return `${y}-${m}-${day}`
 }
 
+// ------------------ main component ------------------
 export default function App() {
-  const [habits, setHabits] = useState<Habit[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [duration, setDuration] = useState<number | "">("")
+  // --- inner state & constants ---
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [duration, setDuration] = useState<number | "">("");
+  const [pendingId, setPendingId] = useState<number | null>(null);
 
+  // --- inner functions ---
   async function load() {
     try {
       setLoading(true)
       setHabits(await http<Habit[]>("/api/habits?includeArchived=false"))
-    } catch (e: any) {
+    }
+    catch (e: any) {
       setError(e.message ?? "Failed to load")
-    } finally {
+    }
+    finally {
       setLoading(false)
     }
   }
@@ -49,21 +63,31 @@ export default function App() {
   useEffect(() => { load() }, [])
 
   async function checkIn(habitId: number) {
-    const body = {
-      localDate: todayLocalISO(),
-      durationMinutes: duration === "" ? null : Number(duration),
-      userTimeZoneIana: Intl.DateTimeFormat().resolvedOptions().timeZone // e.g. Pacific/Auckland
+    setPendingId(habitId);
+    try {
+      const body = {
+        localDate: todayLocalISO(),
+        durationMinutes: duration === "" ? null : Number(duration),
+        userTimeZoneIana: Intl.DateTimeFormat().resolvedOptions().timeZone // e.g. Pacific/Auckland
+      }
+      await http<CheckIn>(`/api/habits/${habitId}/checkins`, {
+        method: "POST",
+        body: JSON.stringify(body)
+      })
+      await load();
     }
-    await http<CheckIn>(`/api/habits/${habitId}/checkins`, {
-      method: "POST",
-      body: JSON.stringify(body)
-    })
-    alert("Checked!")
+    catch (e: any) {
+      alert(e.message ?? "Failed to check-in")
+    }
+    finally {
+      setPendingId(null);
+    }
   }
 
   if (loading) return <div style={{ padding: 16 }}>Loading…</div>
   if (error) return <div style={{ padding: 16, color: "red" }}>{error}</div>
 
+  // --- output ---
   return (
     <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
       <h1>Habit Tracker</h1>
@@ -92,11 +116,14 @@ export default function App() {
               <div style={{ opacity: 0.8 }}>{h.description}</div>
             </div>
             <div>
-              <button onClick={() => checkIn(h.id)}>Check-in Today</button>
+              <button disabled={pendingId === h.id} onClick={() => checkIn(h.id)}>
+                {pendingId === h.id ? "Checking…" : "Check-in Today"}
+              </button>
             </div>
           </li>
         ))}
       </ul>
+
     </div>
   )
 }
