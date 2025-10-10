@@ -1,3 +1,102 @@
+import { useEffect, useState } from "react"
+
+type Habit = {
+  id: number
+  name: string
+  description?: string
+  colorHex?: string
+  iconKey?: string
+  isArchived: boolean
+}
+type CheckIn = { id: number; habitId: number; localDate: string; durationMinutes?: number }
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:5000"
+
+async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    ...init,
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+function todayLocalISO(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
 export default function App() {
-  return <div style={{ padding: 24 }}>Hello, React + Vite!</div>
+  const [habits, setHabits] = useState<Habit[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [duration, setDuration] = useState<number | "">("")
+
+  async function load() {
+    try {
+      setLoading(true)
+      setHabits(await http<Habit[]>("/api/habits?includeArchived=false"))
+    } catch (e: any) {
+      setError(e.message ?? "Failed to load")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  async function checkIn(habitId: number) {
+    const body = {
+      localDate: todayLocalISO(),
+      durationMinutes: duration === "" ? null : Number(duration),
+      userTimeZoneIana: Intl.DateTimeFormat().resolvedOptions().timeZone // e.g. Pacific/Auckland
+    }
+    await http<CheckIn>(`/api/habits/${habitId}/checkins`, {
+      method: "POST",
+      body: JSON.stringify(body)
+    })
+    alert("Checked!")
+  }
+
+  if (loading) return <div style={{ padding: 16 }}>Loading…</div>
+  if (error) return <div style={{ padding: 16, color: "red" }}>{error}</div>
+
+  return (
+    <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
+      <h1>Habit Tracker</h1>
+
+      <div style={{ margin: "12px 0" }}>
+        <label>Duration (minutes, optional): </label>
+        <input
+          type="number"
+          min={0}
+          value={duration}
+          onChange={e => setDuration(e.target.value === "" ? "" : Number(e.target.value))}
+          style={{ width: 120 }}
+        />
+        <span style={{ marginLeft: 12, opacity: 0.7 }}>today: {todayLocalISO()}</span>
+      </div>
+
+      <ul style={{ listStyle: "none", padding: 0 }}>
+        {habits.map(h => (
+          <li key={h.id} style={{
+            border: "1px solid #333", borderRadius: 12, padding: 16,
+            marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between",
+            background: h.colorHex ?? "#1e1e1e"
+          }}>
+            <div>
+              <div style={{ fontWeight: 700 }}>{h.name}</div>
+              <div style={{ opacity: 0.8 }}>{h.description}</div>
+            </div>
+            <div>
+              <button onClick={() => checkIn(h.id)}>Check-in Today</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }
