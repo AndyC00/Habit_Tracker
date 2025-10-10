@@ -198,35 +198,48 @@ app.MapGet("/api/habits/{id:int}/calendar", async (AppDbContext db, int id, stri
     return Results.Ok(result);
 });
 
-app.MapGet("/api/habits/{id:int}/stats", async (AppDbContext db, int id, string? month) =>
+app.MapGet("/api/habits/{id:int}/stats", async (AppDbContext db, int id, string? month, string? tz) =>
 {
-    var habit = await db.Habits.AsNoTracking().FirstOrDefaultAsync(h => h.Id == id && h.UserId == 1);
+    var habit = await db.Habits.AsNoTracking()
+        .FirstOrDefaultAsync(h => h.Id == id && h.UserId == 1);
     if (habit is null) return Results.NotFound();
 
-    var allDates = await db.HabitCheckIns.AsNoTracking()
+    // take all check-ins for this habit
+    var all = await db.HabitCheckIns.AsNoTracking()
         .Where(c => c.HabitId == id)
         .OrderBy(c => c.LocalDate)
-        .Select(c => c.LocalDate)
+        .Select(c => new { c.LocalDate, c.DurationMinutes })
         .ToListAsync();
 
-    int completedTotal = allDates.Count;
+    int completedTotal = all.Count;
 
+    // completedThisMonth & durationThisMonth
     int completedThisMonth = 0;
+    int durationThisMonth = 0;
+    int y = 0, m = 0;
     if (!string.IsNullOrWhiteSpace(month) && month.Length == 7 &&
-        int.TryParse(month[..4], out var y) && int.TryParse(month[5..], out var m))
+        int.TryParse(month[..4], out y) && int.TryParse(month[5..], out m))
     {
-        completedThisMonth = allDates.Count(d => d.Year == y && d.Month == m);
+        foreach (var x in all)
+        {
+            if (x.LocalDate.Year == y && x.LocalDate.Month == m)
+            {
+                completedThisMonth++;
+                durationThisMonth += x.DurationMinutes ?? 0;
+            }
+        }
     }
 
-    // the longest streak calculation
+    // the longest streak
     int longest = 0, current = 0;
     DateOnly? prev = null;
-    foreach (var d in allDates)
+    foreach (var x in all)
     {
+        var d = x.LocalDate;
         if (prev is null || d == prev.Value.AddDays(1))
             current++;
         else if (d == prev)
-            continue;   // same day check-in, ignore for now
+            continue;
         else
             current = 1;
 
@@ -234,7 +247,24 @@ app.MapGet("/api/habits/{id:int}/stats", async (AppDbContext db, int id, string?
         prev = d;
     }
 
-    return Results.Ok(new StatsDto(completedThisMonth, completedTotal, longest));
+    // total duration mins
+    int totalDurationMinutes = all.Sum(x => x.DurationMinutes ?? 0);
+
+    // does user have check-in for today
+    var todayLocal = HabitTracker.Api.Utils.TimeHelpers.LocalToday(tz ?? "Pacific/Auckland");
+    var todayRec = all.FirstOrDefault(x => x.LocalDate == todayLocal);
+    bool hasToday = todayRec is not null;
+    int? todayMinutes = todayRec?.DurationMinutes;
+
+    return Results.Ok(new StatsDto(
+        CompletedThisMonth: completedThisMonth,
+        CompletedTotal: completedTotal,
+        LongestStreak: longest,
+        TotalDurationMinutes: totalDurationMinutes,
+        DurationThisMonth: durationThisMonth,
+        HasTodayCheckIn: hasToday,
+        TodayDurationMinutes: todayMinutes
+    ));
 });
 
 app.Run();

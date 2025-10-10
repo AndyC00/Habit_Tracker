@@ -10,6 +10,7 @@ type Habit = {
   iconKey?: string;
   isArchived: boolean;
 };
+
 type CheckIn = {
   id: number;
   habitId: number;
@@ -25,16 +26,31 @@ type HabitFormValues = {
   isArchived: boolean;
 };
 
+type Stats = {
+  completedThisMonth: number;
+  completedTotal: number;
+  longestStreak: number;
+  totalDurationMinutes: number;
+  durationThisMonth: number;
+  hasTodayCheckIn: boolean;
+  todayDurationMinutes: number | null;
+};
+
 // ------------------ helper functions ------------------
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const base = import.meta.env.VITE_API_BASE as string;
-  if (!base) throw new Error("VITE_API_BASE in .env is not set");
+  const raw = import.meta.env.VITE_API_BASE as string;
+  if (!raw) throw new Error("VITE_API_BASE in .env is not set");
+  const base = raw.replace(/\/+$/, "");
 
   const res = await fetch(`${base}${path}`, {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     ...init,
   });
+
   if (!res.ok) throw new Error(await res.text());
+
+  if (res.status === 204) return undefined as T;
+
   return res.json();
 }
 
@@ -46,14 +62,20 @@ function todayLocalISO(): string {
   return `${y}-${m}-${day}`;
 }
 
+const ianaTz = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+const monthOf = (isoDate: string) => isoDate.slice(0, 7);
+
 // ------------------ main component ------------------
 export default function App() {
   // --- inner state & constants ---
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [duration, setDuration] = useState<number | "">("");
+
+  const [statsById, setStatsById] = useState<Record<number, Stats | undefined>>({});
+  const [durationById, setDurationById] = useState<Record<number, number | "" | undefined>>({});
   const [pendingId, setPendingId] = useState<number | null>(null);
+
   const defaultFormValues: HabitFormValues = {
     name: "",
     description: "",
@@ -61,11 +83,13 @@ export default function App() {
     iconKey: "",
     isArchived: false,
   };
+
   const [formMode, setFormMode] = useState<
     | null
     | { type: "create" }
     | { type: "edit"; habitId: number }
   >(null);
+
   const [formValues, setFormValues] = useState<HabitFormValues>(defaultFormValues);
   const [formError, setFormError] = useState<string | null>(null);
   const [formPending, setFormPending] = useState(false);
@@ -74,10 +98,34 @@ export default function App() {
   async function load() {
     try {
       setLoading(true);
-      setHabits(await http<Habit[]>("/api/habits?includeArchived=false"));
-    } catch (e: any) {
+      const list = await http<Habit[]>("/api/habits?includeArchived=false");
+      setHabits(list);
+
+      // Load stats for each habit (including total duration, today's duration, etc.)
+      const today = todayLocalISO();
+      const mo = monthOf(today);
+      const tz = ianaTz();
+
+      const entries = await Promise.all(
+        list.map(async (h) => {
+          const s = await http<Stats>(`/api/habits/${h.id}/stats?month=${mo}&tz=${encodeURIComponent(tz)}`);
+          return [h.id, s] as const;
+        })
+      );
+      const statsMap: Record<number, Stats> = {};
+      const durMap: Record<number, number | "" | undefined> = {};
+      for (const [id, s] of entries) {
+        statsMap[id] = s;
+        // Initialize the minute input for each row: if today is checked in, fill today's minutes by default for easy update
+        durMap[id] = s.todayDurationMinutes ?? "";
+      }
+      setStatsById(statsMap);
+      setDurationById(durMap);
+    } 
+    catch (e: any) {
       setError(e.message ?? "Failed to load");
-    } finally {
+    } 
+    finally {
       setLoading(false);
     }
   }
@@ -89,23 +137,52 @@ export default function App() {
   async function checkIn(habitId: number) {
     setPendingId(habitId);
     try {
+      const value = durationById[habitId];
       const body = {
         localDate: todayLocalISO(),
-        durationMinutes: duration === "" ? null : Number(duration),
-        userTimeZoneIana: Intl.DateTimeFormat().resolvedOptions().timeZone, // e.g. Pacific/Auckland
+        durationMinutes: value === "" || value === undefined ? null : Number(value),
+        userTimeZoneIana: ianaTz()
       };
       await http<CheckIn>(`/api/habits/${habitId}/checkins`, {
         method: "POST",
         body: JSON.stringify(body),
       });
-      await load();
-    } catch (e: any) {
+      await refreshStatsFor(habitId); // Refresh stats for this row & input box
+    }
+    catch (e: any) {
       alert(e.message ?? "Failed to check-in");
-    } finally {
+    }
+    finally {
       setPendingId(null);
     }
   }
 
+  async function undoToday(habitId: number) {
+    if (!confirm("Undo today's check-in?")) return;
+    setPendingId(habitId);
+    try {
+      await http<void>(`/api/habits/${habitId}/checkins/${todayLocalISO()}`, {
+        method: "DELETE",
+      });
+      await refreshStatsFor(habitId);
+    }
+    catch (e: any) {
+      alert(e.message ?? "Failed to undo");
+    }
+    finally {
+      setPendingId(null);
+    }
+  }
+
+  async function refreshStatsFor(habitId: number) {
+    const mo = monthOf(todayLocalISO());
+    const tz = ianaTz();
+    const s = await http<Stats>(`/api/habits/${habitId}/stats?month=${mo}&tz=${encodeURIComponent(tz)}`);
+    setStatsById((prev) => ({ ...prev, [habitId]: s }));
+    setDurationById((prev) => ({ ...prev, [habitId]: s.todayDurationMinutes ?? "" }));
+  }
+
+  // --- form functions ---
   function openCreateForm() {
     setFormValues(defaultFormValues);
     setFormMode({ type: "create" });
@@ -169,9 +246,11 @@ export default function App() {
 
       await load();
       closeForm();
-    } catch (e: any) {
+    }
+    catch (e: any) {
       setFormError(e.message ?? "Failed to save habit.");
-    } finally {
+    }
+    finally {
       setFormPending(false);
     }
   }
@@ -190,47 +269,77 @@ export default function App() {
         </button>
       </div>
 
-      <div className="duration">
-        <label>Duration (minutes, optional): </label>
-        <input
-          type="number"
-          min={0}
-          value={duration}
-          onChange={(e) =>
-            setDuration(e.target.value === "" ? "" : Number(e.target.value))
-          }
-        />
-        <span className="today">today: {todayLocalISO()}</span>
-      </div>
+<ul className="habits">
+        {habits.map((h) => {
+          const stats = statsById[h.id];
+          const dur = durationById[h.id] ?? "";
+          const bg = h.colorHex ?? "#1e1e1e";
 
-      <ul className="habits">
-        {habits.map((h) => (
-          <li
-            key={h.id}
-            className="habit-item"
-            style={{ ["--bg" as any]: h.colorHex ?? "#1e1e1e" }}  // control bg color via CSS variable
-          >
-            <div className="habit-info">
-              <div className="habit-title">
-                {h.name}
-                {h.isArchived && <span className="habit-archived">Archived</span>}
+          return (
+            <li key={h.id} className="habit-item" style={{ ["--bg" as any]: bg }}>
+              <div className="habit-info">
+                <div className="habit-title">
+                  {h.name}
+                  {h.isArchived && <span className="habit-archived">Archived</span>}
+                </div>
+                {h.description && <div className="habit-desc">{h.description}</div>}
+
+                <div className="habit-stats">
+                  <span>Completed (total): {stats?.completedTotal ?? 0} days</span>
+                  <span>Longest streak: {stats?.longestStreak ?? 0}</span>
+                  <span>Total minutes: {stats?.totalDurationMinutes ?? 0}</span>
+                  <span>This month minutes: {stats?.durationThisMonth ?? 0}</span>
+                </div>
               </div>
-              {h.description && <div className="habit-desc">{h.description}</div>}
-            </div>
-            <div className="habit-actions">
-              <button className="btn" onClick={() => openEditForm(h)}>
-                Edit
-              </button>
-              <button
-                className="btn"
-                disabled={pendingId === h.id}
-                onClick={() => checkIn(h.id)}
-              >
-                {pendingId === h.id ? "Checking…" : "Check-in Today"}
-              </button>
-            </div>
-          </li>
-        ))}
+
+              <div className="habit-actions">
+                <div className="row">
+                  <label style={{ marginRight: 8 }}>Today minutes</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={dur}
+                    onChange={(e) =>
+                      setDurationById((prev) => ({
+                        ...prev,
+                        [h.id]: e.target.value === "" ? "" : Number(e.target.value),
+                      }))
+                    }
+                    style={{ width: 120, marginRight: 8 }}
+                    placeholder="optional"
+                  />
+                  <button
+                    className="btn"
+                    disabled={pendingId === h.id}
+                    onClick={() => checkIn(h.id)}
+                    title={stats?.hasTodayCheckIn ? "Update today's minutes" : "Check-in today"}
+                  >
+                    {pendingId === h.id
+                      ? "Saving…"
+                      : stats?.hasTodayCheckIn
+                      ? "Update Today"
+                      : "Check-in Today"}
+                  </button>
+
+                  <button
+                    className="btn"
+                    disabled={pendingId === h.id || !stats?.hasTodayCheckIn}
+                    onClick={() => undoToday(h.id)}
+                    style={{ marginLeft: 8 }}
+                  >
+                    Undo Today
+                  </button>
+                </div>
+
+                <div className="row" style={{ marginTop: 8 }}>
+                  <button className="btn" onClick={() => openEditForm(h)}>
+                    Edit
+                  </button>
+                </div>
+              </div>
+            </li>
+          );
+        })}
       </ul>
 
       {formMode && (
