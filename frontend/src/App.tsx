@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
+import * as store from "./lib/localStore";  // future use import { http } from "./lib/http"; when changed to cloud
+
+
 // ------------------ constants and types ------------------
 type Habit = {
   id: number;
   name: string;
-  description?: string;
-  colorHex?: string;
-  iconKey?: string;
+  description?: string | null;
+  colorHex?: string | null;
+  iconKey?: string | null;
   isArchived: boolean;
 };
 
@@ -37,22 +40,22 @@ type Stats = {
 };
 
 // ------------------ helper functions ------------------
-async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const raw = import.meta.env.VITE_API_BASE as string;
-  if (!raw) throw new Error("VITE_API_BASE in .env is not set");
-  const base = raw.replace(/\/+$/, "");
+// async function http<T>(path: string, init?: RequestInit): Promise<T> {
+//   const raw = import.meta.env.VITE_API_BASE as string;
+//   if (!raw) throw new Error("VITE_API_BASE in .env is not set");
+//   const base = raw.replace(/\/+$/, "");
 
-  const res = await fetch(`${base}${path}`, {
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-    ...init,
-  });
+//   const res = await fetch(`${base}${path}`, {
+//     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+//     ...init,
+//   });
 
-  if (!res.ok) throw new Error(await res.text());
+//   if (!res.ok) throw new Error(await res.text());
 
-  if (res.status === 204) return undefined as T;
+//   if (res.status === 204) return undefined as T;
 
-  return res.json();
-}
+//   return res.json();
+// }
 
 function todayLocalISO(): string {
   const d = new Date();
@@ -62,8 +65,8 @@ function todayLocalISO(): string {
   return `${y}-${m}-${day}`;
 }
 
-const ianaTz = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
-const monthOf = (isoDate: string) => isoDate.slice(0, 7);
+// const ianaTz = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+// const monthOf = (isoDate: string) => isoDate.slice(0, 7);
 
 // ------------------ main component ------------------
 export default function App() {
@@ -98,37 +101,37 @@ export default function App() {
   async function load() {
     try {
       setLoading(true);
-      const list = await http<Habit[]>("/api/habits?includeArchived=false");
+      const list = await store.listHabits(false);
       setHabits(list);
 
-      // Load stats for each habit (including total duration, today's duration, etc.)
       const today = todayLocalISO();
-      const mo = monthOf(today);
-      const tz = ianaTz();
+      const mo = today.slice(0, 7);
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
       const entries = await Promise.all(
         list.map(async (h) => {
-          const s = await http<Stats>(`/api/habits/${h.id}/stats?month=${mo}&tz=${encodeURIComponent(tz)}`);
+          const s = await store.getStats(h.id, mo, tz);
           return [h.id, s] as const;
         })
       );
+
       const statsMap: Record<number, Stats> = {};
       const durMap: Record<number, number | "" | undefined> = {};
       for (const [id, s] of entries) {
         statsMap[id] = s;
-        // Initialize the minute input for each row: if today is checked in, fill today's minutes by default for easy update
         durMap[id] = s.todayDurationMinutes ?? "";
       }
       setStatsById(statsMap);
       setDurationById(durMap);
-    } 
+    }
     catch (e: any) {
       setError(e.message ?? "Failed to load");
-    } 
+    }
     finally {
       setLoading(false);
     }
   }
+
 
   useEffect(() => {
     load();
@@ -138,46 +141,36 @@ export default function App() {
     setPendingId(habitId);
     try {
       const value = durationById[habitId];
-      const body = {
+      await store.upsertCheckIn(habitId, {
         localDate: todayLocalISO(),
         durationMinutes: value === "" || value === undefined ? null : Number(value),
-        userTimeZoneIana: ianaTz()
-      };
-      await http<CheckIn>(`/api/habits/${habitId}/checkins`, {
-        method: "POST",
-        body: JSON.stringify(body),
+        userTimeZoneIana: Intl.DateTimeFormat().resolvedOptions().timeZone
       });
-      await refreshStatsFor(habitId); // Refresh stats for this row & input box
-    }
-    catch (e: any) {
+      await refreshStatsFor(habitId);
+    } catch (e: any) {
       alert(e.message ?? "Failed to check-in");
-    }
-    finally {
+    } finally {
       setPendingId(null);
     }
   }
 
   async function undoToday(habitId: number) {
-    if (!confirm("Undo today's check-in?")) return;
     setPendingId(habitId);
     try {
-      await http<void>(`/api/habits/${habitId}/checkins/${todayLocalISO()}`, {
-        method: "DELETE",
-      });
+      await store.deleteCheckIn(habitId, todayLocalISO());
       await refreshStatsFor(habitId);
-    }
-    catch (e: any) {
+    } catch (e: any) {
       alert(e.message ?? "Failed to undo");
-    }
-    finally {
+    } finally {
       setPendingId(null);
     }
   }
 
   async function refreshStatsFor(habitId: number) {
-    const mo = monthOf(todayLocalISO());
-    const tz = ianaTz();
-    const s = await http<Stats>(`/api/habits/${habitId}/stats?month=${mo}&tz=${encodeURIComponent(tz)}`);
+    const mo = todayLocalISO().slice(0, 7);
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const s = await store.getStats(habitId, mo, tz);
+
     setStatsById((prev) => ({ ...prev, [habitId]: s }));
     setDurationById((prev) => ({ ...prev, [habitId]: s.todayDurationMinutes ?? "" }));
   }
@@ -233,17 +226,10 @@ export default function App() {
       };
 
       if (formMode.type === "create") {
-        await http<Habit>("/api/habits", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
+        await store.createHabit(payload);
       } else {
-        await http<Habit>(`/api/habits/${formMode.habitId}`, {
-          method: "PUT",
-          body: JSON.stringify({ ...payload, isArchived: formValues.isArchived }),
-        });
+        await store.updateHabit(formMode.habitId, { ...payload, isArchived: formValues.isArchived });
       }
-
       await load();
       closeForm();
     }
@@ -269,7 +255,7 @@ export default function App() {
         </button>
       </div>
 
-<ul className="habits">
+      <ul className="habits">
         {habits.map((h) => {
           const stats = statsById[h.id];
           const dur = durationById[h.id] ?? "";
@@ -317,8 +303,8 @@ export default function App() {
                     {pendingId === h.id
                       ? "Saving…"
                       : stats?.hasTodayCheckIn
-                      ? "Update Today"
-                      : "Check-in Today"}
+                        ? "Update Today"
+                        : "Check-in Today"}
                   </button>
 
                   <button
@@ -420,8 +406,8 @@ export default function App() {
                 {formPending
                   ? "Saving…"
                   : formMode.type === "create"
-                  ? "Create Habit"
-                  : "Save Changes"}
+                    ? "Create Habit"
+                    : "Save Changes"}
               </button>
             </div>
           </form>
