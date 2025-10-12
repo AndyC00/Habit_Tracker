@@ -14,13 +14,6 @@ type Habit = {
   isArchived: boolean;
 };
 
-type CheckIn = {
-  id: number;
-  habitId: number;
-  localDate: string;
-  durationMinutes?: number;
-};
-
 type HabitFormValues = {
   name: string;
   description: string;
