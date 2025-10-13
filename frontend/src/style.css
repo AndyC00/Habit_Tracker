@@ -75,10 +75,12 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  color:#3b73a8;
 }
 
 .habit-desc {
   opacity: 0.8;
+  color:#0581a7;
 }
 
 .habit-archived {

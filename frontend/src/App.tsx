@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { Dumbbell, BookOpen, Droplet, Moon, Code, Music, Coffee, Target, Timer, Circle } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import * as store from "./lib/localStore";  // future use import { http } from "./lib/http"; when changed to cloud
 
@@ -32,6 +34,21 @@ type Stats = {
   todayDurationMinutes: number | null;
 };
 
+const ICONS = {
+  gym: Dumbbell,
+  read: BookOpen,
+  water: Droplet,
+  sleep: Moon,
+  code: Code,
+  music: Music,
+  coffee: Coffee,
+  focus: Target,
+  pomodoro: Timer,
+} as const;
+
+type IconKey = keyof typeof ICONS;
+const DEFAULT_ICON: LucideIcon = Circle;
+
 // ------------------ helper functions ------------------
 // async function http<T>(path: string, init?: RequestInit): Promise<T> {
 //   const raw = import.meta.env.VITE_API_BASE as string;
@@ -60,6 +77,23 @@ function todayLocalISO(): string {
 
 // const ianaTz = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 // const monthOf = (isoDate: string) => isoDate.slice(0, 7);
+
+function getIconByKey(key?: string | null): LucideIcon {
+  if (!key) return DEFAULT_ICON;
+  return (ICONS as Record<string, LucideIcon>)[key] ?? DEFAULT_ICON;
+}
+
+const ICON_OPTIONS: { key: IconKey; label: string }[] = [
+  { key: "gym", label: "Gym / Workout" },
+  { key: "read", label: "Read" },
+  { key: "water", label: "Drink Water" },
+  { key: "sleep", label: "Sleep" },
+  { key: "code", label: "Code" },
+  { key: "music", label: "Music" },
+  { key: "coffee", label: "Coffee" },
+  { key: "focus", label: "Focus" },
+  { key: "pomodoro", label: "Pomodoro" },
+];
 
 // ------------------ main component ------------------
 export default function App() {
@@ -258,16 +292,20 @@ export default function App() {
             <li key={h.id} className="habit-item" style={{ ["--bg" as any]: bg }}>
               <div className="habit-info">
                 <div className="habit-title">
+                  {(() => {
+                    const Icon = getIconByKey(h.iconKey);
+                    return <Icon className="habit-icon" size={18} />;
+                  })()}
                   {h.name}
                   {h.isArchived && <span className="habit-archived">Archived</span>}
                 </div>
                 {h.description && <div className="habit-desc">{h.description}</div>}
 
                 <div className="habit-stats">
-                  <span>Completed (total): {stats?.completedTotal ?? 0} days</span>
-                  <span>Longest streak: {stats?.longestStreak ?? 0}</span>
-                  <span>Total minutes: {stats?.totalDurationMinutes ?? 0}</span>
-                  <span>This month minutes: {stats?.durationThisMonth ?? 0}</span>
+                  <p>Completed (total): {stats?.completedTotal ?? 0} days</p>
+                  <p>Longest streak: {stats?.longestStreak ?? 0}</p>
+                  <p>Total minutes: {stats?.totalDurationMinutes ?? 0}</p>
+                  <p>This month minutes: {stats?.durationThisMonth ?? 0}</p>
                 </div>
               </div>
 
@@ -360,15 +398,28 @@ export default function App() {
             </label>
 
             <label>
-              Icon Key
-              <input
-                type="text"
-                value={formValues.iconKey}
-                onChange={(e) =>
-                  setFormValues({ ...formValues, iconKey: e.target.value })
-                }
-                placeholder="Optional icon identifier"
-              />
+              Icon
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <select
+                  value={formValues.iconKey}
+                  onChange={(e) =>
+                    setFormValues({ ...formValues, iconKey: e.target.value })
+                  }
+                >
+                  <option value="">(None)</option>
+                  {ICON_OPTIONS.map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <span title={formValues.iconKey || "default"}>
+                  {(() => {
+                    const Preview = getIconByKey(formValues.iconKey);
+                    return <Preview size={18} />;
+                  })()}
+                </span>
+              </div>
             </label>
 
             {formMode.type === "edit" && (
