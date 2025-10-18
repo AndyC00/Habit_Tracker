@@ -346,10 +346,11 @@ export default function App() {
                   >
                     Undo Today
                   </button>
-                </div>
-
-                <div className="row" style={{ marginTop: 8 }}>
-                  <button className="btn" onClick={() => openEditForm(h)}>
+                  <button
+                    className="btn"
+                    onClick={() => openEditForm(h)}
+                    style={{ marginLeft: 8 }}
+                  >
                     Edit
                   </button>
                 </div>

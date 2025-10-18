@@ -1,6 +1,6 @@
 // store the data in browser localStorage for now
 // will migrate to server AWS cloud or Google cloud later
-const NS = "habittracker:v1";
+const NS = "habittracker:v1"; // namespace for the localStorage
 
 export type Habit = {
   id: number;
@@ -66,6 +66,7 @@ function loadDB(): DB {
     return reset;
   }
 }
+
 function saveDB(db: DB) {
   localStorage.setItem(NS, JSON.stringify(db));
 }
