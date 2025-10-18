@@ -95,6 +95,34 @@ const ICON_OPTIONS: { key: IconKey; label: string }[] = [
   { key: "pomodoro", label: "Pomodoro" },
 ];
 
+const COLOR_OPTIONS: { name: string; value: string }[] = [
+  { name: "Red", value: "#ef4444" },
+  { name: "Orange", value: "#f97316" },
+  { name: "Amber", value: "#f59e0b" },
+  { name: "Yellow", value: "#eab308" },
+  { name: "Lime", value: "#84cc16" },
+  { name: "Green", value: "#22c55e" },
+  { name: "Emerald", value: "#10b981" },
+  { name: "Teal", value: "#14b8a6" },
+  { name: "Cyan", value: "#06b6d4" },
+  { name: "Sky", value: "#0ea5e9" },
+  { name: "Blue", value: "#3b82f6" },
+  { name: "Indigo", value: "#6366f1" },
+  { name: "Violet", value: "#8b5cf6" },
+  { name: "Purple", value: "#a855f7" },
+  { name: "Fuchsia", value: "#d946ef" },
+  { name: "Pink", value: "#ec4899" },
+  { name: "Rose", value: "#f43f5e" },
+  { name: "Slate", value: "#64748b" },
+  { name: "Gray", value: "#6b7280" },
+  { name: "Zinc", value: "#71717a" },
+  { name: "Neutral", value: "#737373" },
+  { name: "Stone", value: "#78716c" },
+  { name: "Brown", value: "#92400e" },
+  { name: "Black", value: "#000000" },
+  { name: "White", value: "#ffffff" },
+];
+
 // ------------------ main component ------------------
 export default function App() {
   // --- inner state & constants ---
@@ -232,6 +260,7 @@ export default function App() {
     const trimmed = value.trim();
     return trimmed === "" ? null : trimmed;
   }
+
 
   async function submitForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -387,15 +416,32 @@ export default function App() {
             </label>
 
             <label>
-              Color Hex
-              <input
-                type="text"
-                value={formValues.colorHex}
-                onChange={(e) =>
-                  setFormValues({ ...formValues, colorHex: e.target.value })
-                }
-                placeholder="#RRGGBB"
-              />
+              Color
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <select
+                  value={formValues.colorHex}
+                  onChange={(e) =>
+                    setFormValues({ ...formValues, colorHex: e.target.value })
+                  }
+                >
+                  <option value="">(None)</option>
+                  {COLOR_OPTIONS.map((c) => (
+                    <option key={c.value} value={c.value}>{c.name}</option>
+                  ))}
+                </select>
+                <span title={formValues.colorHex || "default"}>
+                  <span
+                    style={{
+                      width: 18,
+                      height: 18,
+                      display: "inline-block",
+                      borderRadius: 4,
+                      border: "1px solid #444",
+                      background: formValues.colorHex || "#1e1e1e",
+                    }}
+                  />
+                </span>
+              </div>
             </label>
 
             <label>
