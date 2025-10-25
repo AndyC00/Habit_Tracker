@@ -315,8 +315,15 @@ export default function App() {
 
       if (formMode.type === "create") {
         await store.createHabit(payload);
-      } else {
+      } 
+      else if (formMode.type === "edit") {
         await store.updateHabit(formMode.habitId, { ...payload, isArchived: formValues.isArchived });
+      } 
+      else {
+        // If somehow submitting while in archived or an unknown mode, bail out.
+        setFormError("Cannot submit form in current mode.");
+        setFormPending(false);
+        return;
       }
       await load();
       closeForm();
@@ -456,7 +463,6 @@ export default function App() {
                               <p>This month minutes: {stats?.durationThisMonth ?? 0}</p>
                             </div>
                           </div>
-                          {/* No action buttons for archived view */}
                         </li>
                       );
                     })}
