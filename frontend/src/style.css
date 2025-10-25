@@ -147,6 +147,19 @@
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
 }
 
+/* Archived modal: viewport-proportional size with scrollable content */
+.habit-form-archived {
+  width: 80vw;
+  height: 80vh;
+  max-width: 1000px;
+  max-height: 90vh;
+}
+
+.habit-archived-content {
+  flex: 1;
+  overflow: auto;
+}
+
 .habit-form h2 {
   margin: 0;
 }
