@@ -133,6 +133,8 @@ export default function App() {
   const [statsById, setStatsById] = useState<Record<number, Stats | undefined>>({});
   const [durationById, setDurationById] = useState<Record<number, number | "" | undefined>>({});
   const [pendingId, setPendingId] = useState<number | null>(null);
+  const [archivedHabits, setArchivedHabits] = useState<Habit[]>([]);
+  const [archivedStatsById, setArchivedStatsById] = useState<Record<number, Stats | undefined>>({});
 
   const defaultFormValues: HabitFormValues = {
     name: "",
@@ -146,6 +148,7 @@ export default function App() {
     | null
     | { type: "create" }
     | { type: "edit"; habitId: number }
+    | { type: "archived" }
   >(null);
 
   const [formValues, setFormValues] = useState<HabitFormValues>(defaultFormValues);
@@ -237,6 +240,35 @@ export default function App() {
     setFormError(null);
   }
 
+  function openArchivedForm() {
+    (async () => {
+      try {
+        setFormError(null);
+        // Load archived habits and their stats
+        const list = await store.listHabits(true);
+        const archived = list.filter((h) => h.isArchived);
+        setArchivedHabits(archived);
+
+        const today = todayLocalISO();
+        const mo = today.slice(0, 7);
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const entries = await Promise.all(
+          archived.map(async (h) => {
+            const s = await store.getStats(h.id, mo, tz);
+            return [h.id, s] as const;
+          })
+        );
+        const statsMap: Record<number, Stats> = {};
+        for (const [id, s] of entries) statsMap[id] = s;
+        setArchivedStatsById(statsMap);
+
+        setFormMode({ type: "archived" });
+      } catch (e: any) {
+        setFormError(e.message ?? "Failed to load archived habits.");
+      }
+    })();
+  }
+
   function openEditForm(habit: Habit) {
     setFormValues({
       name: habit.name,
@@ -306,6 +338,9 @@ export default function App() {
       <h1>Habit Tracker</h1>
 
       <div className="actions">
+        <button className="btn archive" onClick={openArchivedForm}>
+          Archived Habits
+        </button>
         <button className="btn primary" onClick={openCreateForm}>
           New Habit
         </button>
@@ -391,8 +426,48 @@ export default function App() {
 
       {formMode && (
         <div className="habit-form-backdrop" role="presentation">
-          <form className="habit-form" onSubmit={submitForm}>
-            <h2>{formMode.type === "create" ? "Create Habit" : "Edit Habit"}</h2>
+          {formMode.type === "archived" ? (
+            <div className="habit-form">
+              <h2>Archived Habits</h2>
+              {archivedHabits.length === 0 ? (
+                <div>No archived habits.</div>
+              ) : (
+                <ul className="habits">
+                  {archivedHabits.map((h) => {
+                    const stats = archivedStatsById[h.id];
+                    const bg = h.colorHex ?? "#1e1e1e";
+                    return (
+                      <li key={h.id} className="habit-item" style={{ ["--bg" as any]: bg }}>
+                        <div className="habit-info">
+                          <div className="habit-title">
+                            {(() => {
+                              const Icon = getIconByKey(h.iconKey);
+                              return <Icon className="habit-icon" size={18} />;
+                            })()}
+                            {h.name}
+                            {h.isArchived && <span className="habit-archived">Archived</span>}
+                          </div>
+                          {h.description && <div className="habit-desc">{h.description}</div>}
+                          <div className="habit-stats">
+                            <p>Completed (total): {stats?.completedTotal ?? 0} days</p>
+                            <p>Longest streak: {stats?.longestStreak ?? 0}</p>
+                            <p>Total minutes: {stats?.totalDurationMinutes ?? 0}</p>
+                            <p>This month minutes: {stats?.durationThisMonth ?? 0}</p>
+                          </div>
+                        </div>
+                        {/* No action buttons for archived view */}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <div className="habit-form-actions">
+                <button type="button" className="btn" onClick={closeForm}>Close</button>
+              </div>
+            </div>
+          ) : (
+            <form className="habit-form" onSubmit={submitForm}>
+              <h2>{formMode.type === "create" ? "Create Habit" : "Edit Habit"}</h2>
 
             <label>
               Name
@@ -484,24 +559,25 @@ export default function App() {
 
             {formError && <div className="habit-form-error">{formError}</div>}
 
-            <div className="habit-form-actions">
-              <button
-                type="button"
-                className="btn"
-                onClick={closeForm}
-                disabled={formPending}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn primary" disabled={formPending}>
-                {formPending
-                  ? "Saving…"
-                  : formMode.type === "create"
-                    ? "Create Habit"
-                    : "Save Changes"}
-              </button>
-            </div>
-          </form>
+              <div className="habit-form-actions">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={closeForm}
+                  disabled={formPending}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn primary" disabled={formPending}>
+                  {formPending
+                    ? "Saving…"
+                    : formMode.type === "create"
+                      ? "Create Habit"
+                      : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       )}
     </div>

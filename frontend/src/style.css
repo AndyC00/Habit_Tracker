@@ -110,6 +110,12 @@
   border-color: #2f7d32;
 }
 
+.btn.archive {
+  margin-right: 8px;
+  background: #ea5555;
+  border-color: #ea5555
+}
+
 .btn:hover {
   filter: brightness(1.1);
 }
