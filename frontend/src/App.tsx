@@ -425,6 +425,28 @@ export default function App() {
                     Edit
                   </button>
                 </div>
+                <div className="row" style={{ marginTop: 8 }}>
+                  <button
+                    className="btn"
+                    onClick={() => console.log("week statistic", h.id)}
+                  >
+                    Week Statistic
+                  </button>
+                  <button
+                    className="btn"
+                    style={{ marginLeft: 8 }}
+                    onClick={() => console.log("month statistic", h.id)}
+                  >
+                    Month Statistic
+                  </button>
+                  <button
+                    className="btn"
+                    style={{ marginLeft: 8 }}
+                    onClick={() => console.log("total statistic", h.id)}
+                  >
+                    Total Statistic
+                  </button>
+                </div>
               </div>
             </li>
           );
