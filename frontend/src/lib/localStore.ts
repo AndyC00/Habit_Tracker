@@ -296,6 +296,44 @@ export async function getRecentSeries(
   return points; // oldest -> newest
 }
 
+export async function getMonthSeries(
+  habitId: number,
+  tz?: string
+): Promise<{ date: string; minutes: number }[]> {
+  const db = loadDB();
+  const checks = db.checkins
+    .filter((c) => c.habitId === habitId)
+    .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0));
+
+  const latest = checks.length > 0 ? checks[checks.length - 1].localDate : todayInTZISO(tz);
+  const y = Number(latest.slice(0, 4));
+  const m = Number(latest.slice(5, 7));
+  const monthKey = latest.slice(0, 7);
+  const start = `${monthKey}-01`;
+  const daysInMonth = new Date(y, m, 0).getDate();
+
+  const map = new Map<string, number | null>();
+  for (const c of checks) {
+    if (c.localDate.startsWith(monthKey)) {
+      map.set(c.localDate, c.durationMinutes ?? 0);
+    }
+  }
+
+  const points: { date: string; minutes: number }[] = [];
+  // Only include days that have "arrived". If this month is the current month (in tz),
+  // cut off at today; otherwise include full month.
+  const today = todayInTZISO(tz);
+  const isCurrentMonth = today.slice(0, 7) === monthKey;
+  const endDay = isCurrentMonth ? Number(today.slice(8, 10)) : daysInMonth;
+  for (let i = 0; i < endDay; i++) {
+    const d = addDaysISO(start, i);
+    const v = map.get(d);
+    points.push({ date: d, minutes: v == null ? 0 : v });
+  }
+
+  return points; // oldest -> newest within month
+}
+
 // ---------- export/import for backup (future use) ----------
 export function exportJson(): string {
   return localStorage.getItem(NS) ?? "";

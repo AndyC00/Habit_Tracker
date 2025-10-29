@@ -136,6 +136,7 @@ export default function App() {
   const [archivedHabits, setArchivedHabits] = useState<Habit[]>([]);
   const [archivedStatsById, setArchivedStatsById] = useState<Record<number, Stats | undefined>>({});
   const [weekChartForId, setWeekChartForId] = useState<number | null>(null);
+  const [monthChartForId, setMonthChartForId] = useState<number | null>(null);
 
   const defaultFormValues: HabitFormValues = {
     name: "",
@@ -436,7 +437,7 @@ export default function App() {
                   <button
                     className="btn"
                     style={{ marginLeft: 8 }}
-                    onClick={() => console.log("month statistic", h.id)}
+                    onClick={() => setMonthChartForId((cur) => (cur === h.id ? null : h.id))}
                   >
                     Month Statistic
                   </button>
@@ -452,6 +453,11 @@ export default function App() {
               {weekChartForId === h.id && (
                 <div style={{ marginTop: 12 }}>
                   <WeekChart habitId={h.id} />
+                </div>
+              )}
+              {monthChartForId === h.id && (
+                <div style={{ marginTop: 12 }}>
+                  <MonthChart habitId={h.id} />
                 </div>
               )}
             </li>
@@ -738,6 +744,115 @@ function WeekChart({ habitId }: { habitId: number }) {
               r={3}
               fill="#ffffff"
             />
+          ))}
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+// ------------------ Month Chart (SVG) ------------------
+function MonthChart({ habitId }: { habitId: number }) {
+  const [points, setPoints] = useState<{ date: string; minutes: number }[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setErr(null);
+        const series = await store.getMonthSeries(habitId);
+        // cumulative values (non-decreasing)
+        let acc = 0;
+        const cumulative = series.map((p) => {
+          acc += p.minutes;
+          return { date: p.date, minutes: acc };
+        });
+        setPoints(cumulative);
+      } catch (e: any) {
+        setErr(e.message ?? "Failed to load month series");
+      }
+    })();
+  }, [habitId]);
+
+  if (err) return <div className="error">{err}</div>;
+  if (!points) return <div className="loading">Loading…</div>;
+
+  // Y-axis 0..max cumulative
+  const values = points.map((p) => p.minutes);
+  const vmax = Math.max(...values);
+  const yMin = 0;
+  const yMax = Math.max(1, vmax);
+  const ticks = 5;
+
+  const width = 540;
+  const height = 220;
+  const margin = { top: 20, right: 24, bottom: 28, left: 40 };
+  const iw = width - margin.left - margin.right;
+  const ih = height - margin.top - margin.bottom;
+
+  const xScale = (i: number) => (i / (points.length - 1)) * iw;
+  const yScale = (v: number) => {
+    if (yMax === yMin) return ih / 2;
+    const t = (v - yMin) / (yMax - yMin);
+    return ih - t * ih;
+  };
+
+  const pathD = points
+    .map((p, i) => `${i === 0 ? "M" : "L"}${xScale(i)},${yScale(p.minutes)}`)
+    .join(" ");
+
+  const gridYs = Array.from({ length: ticks }, (_, i) => i);
+  const yAtTick = (i: number) => {
+    const t = i / (ticks - 1);
+    return yMin + (yMax - yMin) * (1 - t);
+  };
+
+  const labelStride = Math.max(1, Math.ceil(points.length / 10));
+  const fmtDay = (iso: string) => iso.slice(8); // DD
+
+  return (
+    <div className="chart">
+      <svg width={width} height={height} role="img" aria-label="month line chart">
+        <g transform={`translate(${margin.left},${margin.top})`}>
+          {gridYs.map((gi) => {
+            const v = yAtTick(gi);
+            const y = yScale(v);
+            return (
+              <g key={gi}>
+                <line x1={0} y1={y} x2={iw} y2={y} stroke="#333" strokeDasharray="4,4" />
+                <text
+                  x={-8}
+                  y={y}
+                  dominantBaseline="middle"
+                  textAnchor="end"
+                  fontSize={12}
+                  fill="#bbb"
+                >
+                  {Math.round(v)}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* x-axis labels (sparse) */}
+          {points.map((p, i) => (
+            <text
+              key={p.date}
+              x={xScale(i)}
+              y={ih + 16}
+              textAnchor="middle"
+              fontSize={11}
+              fill="#bbb"
+              opacity={i % labelStride === 0 ? 1 : 0}
+            >
+              {i % labelStride === 0 ? fmtDay(p.date) : ""}
+            </text>
+          ))}
+
+          <path d={pathD} fill="none" stroke="#ffffff" strokeWidth={2} />
+
+          {points.map((p, i) => (
+            <circle key={p.date} cx={xScale(i)} cy={yScale(p.minutes)} r={3} fill="#ffffff" />
           ))}
         </g>
       </svg>
