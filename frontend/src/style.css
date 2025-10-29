@@ -126,6 +126,14 @@
   cursor: not-allowed;
 }
 
+/* simple chart container */
+.chart {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 8px;
+}
+
 .habit-form-backdrop {
   position: fixed;
   inset: 0;

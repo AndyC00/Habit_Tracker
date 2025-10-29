@@ -267,6 +267,35 @@ export async function getStats(habitId: number, month?: string, tz?: string): Pr
   };
 }
 
+// ---------- Series (for charts) ----------
+export async function getRecentSeries(
+  habitId: number,
+  days: number,
+  tz?: string
+): Promise<{ date: string; minutes: number }[]> {
+  const db = loadDB();
+  const checks = db.checkins
+    .filter((c) => c.habitId === habitId)
+    .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0));
+
+  const latest = checks.length > 0 ? checks[checks.length - 1].localDate : todayInTZISO(tz);
+  const start = addDaysISO(latest, -(days - 1));
+
+  const map = new Map<string, number | null>();
+  for (const c of checks) {
+    map.set(c.localDate, c.durationMinutes ?? 0);
+  }
+
+  const points: { date: string; minutes: number }[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = addDaysISO(start, i);
+    const v = map.get(d);
+    points.push({ date: d, minutes: v == null ? 0 : v });
+  }
+
+  return points; // oldest -> newest
+}
+
 // ---------- export/import for backup (future use) ----------
 export function exportJson(): string {
   return localStorage.getItem(NS) ?? "";
