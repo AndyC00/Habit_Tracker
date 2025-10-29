@@ -338,6 +338,7 @@ export async function getTotalSeries(
   habitId: number,
   tz?: string
 ): Promise<{ date: string; minutes: number }[]> {
+  void tz; // intentionally read to keep API compatibility
   const db = loadDB();
   const checks = db.checkins
     .filter((c) => c.habitId === habitId)
