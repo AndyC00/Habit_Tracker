@@ -334,6 +334,36 @@ export async function getMonthSeries(
   return points; // oldest -> newest within month
 }
 
+export async function getTotalSeries(
+  habitId: number,
+  tz?: string
+): Promise<{ date: string; minutes: number }[]> {
+  const db = loadDB();
+  const checks = db.checkins
+    .filter((c) => c.habitId === habitId)
+    .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0));
+
+  if (checks.length === 0) return [];
+
+  const start = checks[0].localDate;
+  const end = checks[checks.length - 1].localDate;
+  const days = isoToEpochDays(end) - isoToEpochDays(start) + 1;
+
+  const map = new Map<string, number | null>();
+  for (const c of checks) {
+    map.set(c.localDate, c.durationMinutes ?? 0);
+  }
+
+  const points: { date: string; minutes: number }[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = addDaysISO(start, i);
+    const v = map.get(d);
+    points.push({ date: d, minutes: v == null ? 0 : v });
+  }
+
+  return points; // oldest -> newest over full range
+}
+
 // ---------- export/import for backup (future use) ----------
 export function exportJson(): string {
   return localStorage.getItem(NS) ?? "";

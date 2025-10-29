@@ -4,7 +4,7 @@ import { Dumbbell, BookOpen, Droplet, Moon, Code, Music, Coffee, Target, Timer, 
 import type { LucideIcon } from "lucide-react";
 
 import * as store from "./lib/localStore";  // future use import { http } from "./lib/http"; when changed to cloud
-import { WeekChart, MonthChart } from "./lib/LineCharts";
+import { WeekChart, MonthChart, TotalChart } from "./lib/LineCharts";
 
 
 // ------------------ constants and types ------------------
@@ -138,6 +138,7 @@ export default function App() {
   const [archivedStatsById, setArchivedStatsById] = useState<Record<number, Stats | undefined>>({});
   const [weekChartForId, setWeekChartForId] = useState<number | null>(null);
   const [monthChartForId, setMonthChartForId] = useState<number | null>(null);
+  const [totalChartForId, setTotalChartForId] = useState<number | null>(null);
 
   const defaultFormValues: HabitFormValues = {
     name: "",
@@ -445,7 +446,7 @@ export default function App() {
                   <button
                     className="btn"
                     style={{ marginLeft: 8 }}
-                    onClick={() => console.log("total statistic", h.id)}
+                    onClick={() => setTotalChartForId((cur) => (cur === h.id ? null : h.id))}
                   >
                     Total Statistic
                   </button>
@@ -459,6 +460,11 @@ export default function App() {
               {monthChartForId === h.id && (
                 <div style={{ marginTop: 12 }}>
                   <MonthChart habitId={h.id} />
+                </div>
+              )}
+              {totalChartForId === h.id && (
+                <div style={{ marginTop: 12 }}>
+                  <TotalChart habitId={h.id} />
                 </div>
               )}
             </li>
