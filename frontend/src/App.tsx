@@ -451,7 +451,7 @@ export default function App() {
               </div>
               {weekChartForId === h.id && (
                 <div style={{ marginTop: 12 }}>
-                  <WeekChart habitId={h.id} color={bg} />
+                  <WeekChart habitId={h.id} />
                 </div>
               )}
             </li>
@@ -621,7 +621,7 @@ export default function App() {
 }
 
 // ------------------ Week Chart (SVG) ------------------
-function WeekChart({ habitId, color }: { habitId: number; color: string }) {
+function WeekChart({ habitId }: { habitId: number }) {
   const [points, setPoints] = useState<{ date: string; minutes: number }[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -630,7 +630,13 @@ function WeekChart({ habitId, color }: { habitId: number; color: string }) {
       try {
         setErr(null);
         const series = await store.getRecentSeries(habitId, 7);
-        setPoints(series);
+        // cumulative values (non-decreasing)
+        let acc = 0;
+        const cumulative = series.map((p) => {
+          acc += p.minutes;
+          return { date: p.date, minutes: acc };
+        });
+        setPoints(cumulative);
       } catch (e: any) {
         setErr(e.message ?? "Failed to load week series");
       }
@@ -640,15 +646,12 @@ function WeekChart({ habitId, color }: { habitId: number; color: string }) {
   if (err) return <div className="error">{err}</div>;
   if (!points) return <div className="loading">Loading…</div>;
 
-  // Compute y-scale with center = average, symmetric to include min & max
+  // Y-axis starts from 0 to max cumulative value
   const values = points.map(p => p.minutes);
-  const avg = values.reduce((s, v) => s + v, 0) / (values.length || 1);
-  const vmin = Math.min(...values);
   const vmax = Math.max(...values);
-  const maxDev = Math.max(Math.abs(vmax - avg), Math.abs(avg - vmin));
-  const yMin = avg - maxDev;
-  const yMax = avg + maxDev;
-  const ticks = 5; // odd number -> center tick is average
+  const yMin = 0;
+  const yMax = Math.max(1, vmax); // avoid zero range
+  const ticks = 5;
 
   const width = 540; // chart area including margins
   const height = 220;
@@ -669,9 +672,8 @@ function WeekChart({ habitId, color }: { habitId: number; color: string }) {
     .join(" ");
 
   const gridYs = Array.from({ length: ticks }, (_, i) => i);
-  const centerIdx = Math.floor(ticks / 2);
   const yAtTick = (i: number) => {
-    // map tick i (0..ticks-1) to value linearly from yMax->yMin visually
+    // map tick i (0..ticks-1) to value linearly 0..vmax (displayed top->bottom)
     const t = i / (ticks - 1);
     return yMin + (yMax - yMin) * (1 - t);
   };
@@ -686,7 +688,6 @@ function WeekChart({ habitId, color }: { habitId: number; color: string }) {
           {gridYs.map((gi) => {
             const v = yAtTick(gi);
             const y = yScale(v);
-            const isCenter = gi === centerIdx;
             return (
               <g key={gi}>
                 <line
@@ -694,8 +695,8 @@ function WeekChart({ habitId, color }: { habitId: number; color: string }) {
                   y1={y}
                   x2={iw}
                   y2={y}
-                  stroke={isCenter ? "#666" : "#333"}
-                  strokeDasharray={isCenter ? "" : "4,4"}
+                  stroke="#333"
+                  strokeDasharray="4,4"
                 />
                 <text
                   x={-8}
@@ -726,7 +727,7 @@ function WeekChart({ habitId, color }: { habitId: number; color: string }) {
           ))}
 
           {/* line path */}
-          <path d={pathD} fill="none" stroke={color || "#3b82f6"} strokeWidth={2} />
+          <path d={pathD} fill="none" stroke="#ffffff" strokeWidth={2} />
 
           {/* points */}
           {points.map((p, i) => (
@@ -735,7 +736,7 @@ function WeekChart({ habitId, color }: { habitId: number; color: string }) {
               cx={xScale(i)}
               cy={yScale(p.minutes)}
               r={3}
-              fill={color || "#3b82f6"}
+              fill="#ffffff"
             />
           ))}
         </g>
