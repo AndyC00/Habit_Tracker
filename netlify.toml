@@ -1,10 +1,10 @@
 [build]
+  # Build from the frontend folder so paths stay simple
   base = "frontend"
-  publish = "frontend/dist"
+  publish = "dist"           # IMPORTANT: publish is relative to base
   command = "npm ci && npm run build"
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
