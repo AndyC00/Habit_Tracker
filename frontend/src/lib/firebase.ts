@@ -29,13 +29,14 @@ export function getFirebase() {
     db = getFirestore(app);
 
     if (useAnonAuth) {
-      auth = getAuth(app);
-      onAuthStateChanged(auth, (user) => {
-        if (!user) signInAnonymously(auth).catch(() => {});
+      const a = getAuth(app);
+      auth = a;
+      onAuthStateChanged(a, (user) => {
+        if (!user) signInAnonymously(a).catch(() => {});
         if (resolveAuthReady) resolveAuthReady();
       });
       // kick it off in case there's no current user
-      signInAnonymously(auth).catch(() => {});
+      signInAnonymously(a).catch(() => {});
     }
   }
   return { app, db, auth };
@@ -58,4 +59,3 @@ export function getScopeId(): string {
   }
   return id;
 }
-

@@ -293,6 +293,7 @@ export async function getTotalSeries(
   tz?: string,
 ): Promise<{ date: string; minutes: number }[]> {
   await authReady;
+  void tz; // keep signature stable; tz not used here
   const { db } = getFirebase();
   const scope = getScopeId();
   const qy = query(collection(db, "users", scope, "checkins"), where("habitId", "==", habitId));
