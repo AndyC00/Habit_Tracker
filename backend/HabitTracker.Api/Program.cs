@@ -1,27 +1,21 @@
-using HabitTracker.Api.Data;
 using HabitTracker.Api.Dtos;
-using HabitTracker.Api.Models;
+using HabitTracker.Api.Services;
 using HabitTracker.Api.Utils;
-using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.EntityFrameworkCore;
+using Google.Cloud.Firestore;
+using Google.Apis.Auth.OAuth2;
 using System.Text.Json.Serialization;
 
 // --------------------- Preliminary setup ---------------------
 var builder = WebApplication.CreateBuilder(args);
 
-// using EFcore + SQLite for data storage
-builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseSqlite(builder.Configuration.GetConnectionString("Default")
-        ?? "Data Source=habittracker.db"));
-
-// JSON support for DateOnly
+// JSON options
 builder.Services.ConfigureHttpJsonOptions(opt =>
 {
     opt.SerializerOptions.Converters.Add(new DateOnlyJsonConverter());
     opt.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 });
 
-// for testing use
+// Swagger + CORS
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddCors(opt =>
@@ -29,8 +23,25 @@ builder.Services.AddCors(opt =>
     opt.AddDefaultPolicy(p => p
         .AllowAnyHeader()
         .AllowAnyMethod()
-        .AllowAnyOrigin()); // for MVP only, need to be more restrictive in production version
+        .AllowAnyOrigin());
 });
+
+// Firestore
+builder.Services.AddSingleton(provider =>
+{
+    var projectId = builder.Configuration["FIREBASE_PROJECT_ID"] ?? Environment.GetEnvironmentVariable("FIREBASE_PROJECT_ID") ?? "habittracker-database";
+    var credPath = builder.Configuration["GOOGLE_APPLICATION_CREDENTIALS"] ?? Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
+
+    var builderDb = new FirestoreDbBuilder { ProjectId = projectId };
+    if (!string.IsNullOrWhiteSpace(credPath) && File.Exists(credPath))
+    {
+        // Load explicit credentials from JSON file when provided
+        builderDb.Credential = GoogleCredential.FromFile(credPath);
+    }
+    // Otherwise rely on ADC (gcloud auth application-default login, or platform identity)
+    return builderDb.Build();
+});
+builder.Services.AddSingleton<IFirestoreRepo, FirestoreRepo>();
 
 // build app and middleware pipeline
 var app = builder.Build();
@@ -42,229 +53,92 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
 app.MapGet("/ping", () => Results.Ok(new { ok = true })).WithTags("Health");
 
-
-// --------------------- using Minimal API for Create, Read, Update, Delete (CRUD) ---------------------
-app.MapGet("/api/habits", async (AppDbContext db, bool? includeArchived) =>
+// --------------------- CRUD ---------------------
+app.MapGet("/api/habits", async (IFirestoreRepo repo, bool? includeArchived) =>
 {
-    var q = db.Habits.AsNoTracking().Where(h => h.UserId == 1); // only get userId=1 for MVP
-    if (includeArchived != true) q = q.Where(h => !h.IsArchived);
-    var list = await q.OrderBy(h => h.IsArchived).ThenBy(h => h.Id).ToListAsync();
+    var list = await repo.ListHabitsAsync(includeArchived == true);
     return Results.Ok(list);
 });
 
-app.MapPost("/api/habits", async (AppDbContext db, HabitCreateDto dto) =>
+app.MapPost("/api/habits", async (IFirestoreRepo repo, HabitCreateDto dto) =>
 {
-    if (string.IsNullOrWhiteSpace(dto.Name))
-        return Results.BadRequest("Name is required.");
-
-    var habit = new Habit
-    {
-        Name = dto.Name.Trim(),
-        Description = dto.Description,
-        ColorHex = dto.ColorHex,
-        IconKey = dto.IconKey,
-        UserId = 1
-    };
-    db.Habits.Add(habit);
-    await db.SaveChangesAsync();
+    if (string.IsNullOrWhiteSpace(dto.Name)) return Results.BadRequest("Name is required.");
+    var habit = await repo.CreateHabitAsync(dto);
     return Results.Created($"/api/habits/{habit.Id}", habit);
 });
 
-app.MapPut("/api/habits/{id:int}", async (AppDbContext db, int id, HabitUpdateDto dto) =>
+app.MapPut("/api/habits/{id:int}", async (IFirestoreRepo repo, int id, HabitUpdateDto dto) =>
 {
-    var habit = await db.Habits.FindAsync(id);
-    if (habit is null || habit.UserId != 1)     // only userId=1 for MVP
-        return Results.NotFound();
-
-    if (string.IsNullOrWhiteSpace(dto.Name)) 
-        return Results.BadRequest("Name is required.");
-
-    habit.Name = dto.Name.Trim();
-    habit.Description = dto.Description;
-    habit.ColorHex = dto.ColorHex;
-    habit.IconKey = dto.IconKey;
-    habit.IsArchived = dto.IsArchived;
-
-    await db.SaveChangesAsync();
-    return Results.Ok(habit);
+    if (string.IsNullOrWhiteSpace(dto.Name)) return Results.BadRequest("Name is required.");
+    var updated = await repo.UpdateHabitAsync(id, dto);
+    return updated is null ? Results.NotFound() : Results.Ok(updated);
 });
 
-app.MapPost("/api/habits/{id:int}/archive", async (AppDbContext db, int id) =>
+app.MapPost("/api/habits/{id:int}/archive", async (IFirestoreRepo repo, int id) =>
 {
-    var habit = await db.Habits.FindAsync(id);
-    if (habit is null || habit.UserId != 1)     // only userId=1 for MVP
-        return Results.NotFound();
-
-    habit.IsArchived = true;
-    await db.SaveChangesAsync();
-    return Results.NoContent();
+    var list = await repo.ListHabitsAsync(true);
+    var h = list.FirstOrDefault(x => x.Id == id);
+    if (h is null) return Results.NotFound();
+    var updated = await repo.UpdateHabitAsync(id, new HabitUpdateDto(h.Name, h.Description, h.ColorHex, h.IconKey, true));
+    return updated is null ? Results.NotFound() : Results.NoContent();
 });
 
-app.MapPost("/api/habits/{id:int}/unarchive", async (AppDbContext db, int id) =>
+app.MapPost("/api/habits/{id:int}/unarchive", async (IFirestoreRepo repo, int id) =>
 {
-    var habit = await db.Habits.FindAsync(id);
-    if (habit is null || habit.UserId != 1)     // only userId=1 for MVP
-        return Results.NotFound();
-
-    habit.IsArchived = false;
-    await db.SaveChangesAsync();
-    return Results.NoContent();
+    var list = await repo.ListHabitsAsync(true);
+    var h = list.FirstOrDefault(x => x.Id == id);
+    if (h is null) return Results.NotFound();
+    var updated = await repo.UpdateHabitAsync(id, new HabitUpdateDto(h.Name, h.Description, h.ColorHex, h.IconKey, false));
+    return updated is null ? Results.NotFound() : Results.NoContent();
 });
 
-
-// --------------------- logics for check-ins ---------------------
-app.MapPost("/api/habits/{id:int}/checkins", async (AppDbContext db, int id, CheckInUpsertDto dto) =>
+// --------------------- Check-ins ---------------------
+app.MapPost("/api/habits/{id:int}/checkins", async (IFirestoreRepo repo, int id, CheckInUpsertDto dto) =>
 {
-    var habit = await db.Habits.FindAsync(id);
-    if (habit is null || habit.UserId != 1)     // only userId=1 for MVP
-        return Results.NotFound();
-
-    if (!TimeHelpers.TryParseLocalDate(dto.LocalDate, out var localDate))
-        return Results.BadRequest("Invalid LocalDate. Use yyyy-MM-dd.");
-
-    var todayLocal = TimeHelpers.LocalToday(dto.UserTimeZoneIana ?? "Pacific/Auckland");
-    if (localDate < todayLocal.AddDays(-7) || localDate > todayLocal)   // get last 7 days available for checkin only
-        return Results.BadRequest($"Only last 7 days allowed (including today). Today={todayLocal:yyyy-MM-dd}");
-
-    var check = await db.HabitCheckIns
-        .FirstOrDefaultAsync(c => c.HabitId == id && c.LocalDate == localDate);
-
-    if (check is null)
+    try
     {
-        check = new HabitCheckIn
-        {
-            HabitId = id,
-            LocalDate = localDate,
-            DurationMinutes = dto.DurationMinutes
-        };
-        db.HabitCheckIns.Add(check);
+        var check = await repo.UpsertCheckInAsync(id, dto);
+        return Results.Ok(check);
     }
-    else
+    catch (Exception ex)
     {
-        // update duration if already exists
-        check.DurationMinutes = dto.DurationMinutes;
+        return Results.BadRequest(ex.Message);
     }
-
-    await db.SaveChangesAsync();
-    return Results.Ok(check);
 });
 
-app.MapDelete("/api/habits/{id:int}/checkins/{localDate}", async (AppDbContext db, int id, string localDate) =>
+app.MapDelete("/api/habits/{id:int}/checkins/{localDate}", async (IFirestoreRepo repo, int id, string localDate) =>
 {
-    var habit = await db.Habits.FindAsync(id);
-    if (habit is null || habit.UserId != 1) return Results.NotFound();
-
-    if (!TimeHelpers.TryParseLocalDate(localDate, out var d))
-        return Results.BadRequest("Invalid LocalDate. Use yyyy-MM-dd.");
-
-    var check = await db.HabitCheckIns.FirstOrDefaultAsync(c => c.HabitId == id && c.LocalDate == d);
-    if (check is null) return Results.NotFound();
-
-    db.HabitCheckIns.Remove(check);
-    await db.SaveChangesAsync();
-    return Results.NoContent();
+    var ok = await repo.DeleteCheckInAsync(id, localDate);
+    return ok ? Results.NoContent() : Results.NotFound();
 });
 
-
-// --------------------- logics for calendar & stats ---------------------
-app.MapGet("/api/habits/{id:int}/calendar", async (AppDbContext db, int id, string month /* yyyy-MM */) =>
+app.MapGet("/api/habits/{id:int}/checkins", async (IFirestoreRepo repo, int id) =>
 {
-    var habit = await db.Habits.AsNoTracking().FirstOrDefaultAsync(h => h.Id == id && h.UserId == 1);
-    if (habit is null) return Results.NotFound();
+    var all = await repo.ListCheckinsAsync(id);
+    return Results.Ok(all);
+}).WithTags("CheckIns");
 
-    if (month?.Length != 7 || !int.TryParse(month[..4], out var y) || !int.TryParse(month[5..], out var m))
-        return Results.BadRequest("month must be yyyy-MM");
-
-    var first = new DateOnly(y, m, 1);
-    var days = DateTime.DaysInMonth(y, m);
-    var last = new DateOnly(y, m, days);
-
-    var checks = await db.HabitCheckIns.AsNoTracking()
-        .Where(c => c.HabitId == id && c.LocalDate >= first && c.LocalDate <= last)
-        .ToListAsync();
-
-    var dict = checks.ToDictionary(c => c.LocalDate, c => c);
-    var result = new List<CalendarDayDto>(days);
-    for (int d = 1; d <= days; d++)
+// --------------------- Calendar & Stats ---------------------
+app.MapGet("/api/habits/{id:int}/calendar", async (IFirestoreRepo repo, int id, string month) =>
+{
+    try
     {
-        var date = new DateOnly(y, m, d);
-        if (dict.TryGetValue(date, out var c))
-            result.Add(new CalendarDayDto(date.ToString("yyyy-MM-dd"), true, c.DurationMinutes));
-        else
-            result.Add(new CalendarDayDto(date.ToString("yyyy-MM-dd"), false, null));
+        var result = await repo.GetCalendarAsync(id, month);
+        return Results.Ok(result);
     }
-    return Results.Ok(result);
+    catch (Exception ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
 });
 
-app.MapGet("/api/habits/{id:int}/stats", async (AppDbContext db, int id, string? month, string? tz) =>
+app.MapGet("/api/habits/{id:int}/stats", async (IFirestoreRepo repo, int id, string? month, string? tz) =>
 {
-    var habit = await db.Habits.AsNoTracking()
-        .FirstOrDefaultAsync(h => h.Id == id && h.UserId == 1);
-    if (habit is null) return Results.NotFound();
-
-    // take all check-ins for this habit
-    var all = await db.HabitCheckIns.AsNoTracking()
-        .Where(c => c.HabitId == id)
-        .OrderBy(c => c.LocalDate)
-        .Select(c => new { c.LocalDate, c.DurationMinutes })
-        .ToListAsync();
-
-    int completedTotal = all.Count;
-
-    // completedThisMonth & durationThisMonth
-    int completedThisMonth = 0;
-    int durationThisMonth = 0;
-    int y = 0, m = 0;
-    if (!string.IsNullOrWhiteSpace(month) && month.Length == 7 &&
-        int.TryParse(month[..4], out y) && int.TryParse(month[5..], out m))
-    {
-        foreach (var x in all)
-        {
-            if (x.LocalDate.Year == y && x.LocalDate.Month == m)
-            {
-                completedThisMonth++;
-                durationThisMonth += x.DurationMinutes ?? 0;
-            }
-        }
-    }
-
-    // the longest streak
-    int longest = 0, current = 0;
-    DateOnly? prev = null;
-    foreach (var x in all)
-    {
-        var d = x.LocalDate;
-        if (prev is null || d == prev.Value.AddDays(1))
-            current++;
-        else if (d == prev)
-            continue;
-        else
-            current = 1;
-
-        longest = Math.Max(longest, current);
-        prev = d;
-    }
-
-    // total duration mins
-    int totalDurationMinutes = all.Sum(x => x.DurationMinutes ?? 0);
-
-    // does user have check-in for today
-    var todayLocal = HabitTracker.Api.Utils.TimeHelpers.LocalToday(tz ?? "Pacific/Auckland");
-    var todayRec = all.FirstOrDefault(x => x.LocalDate == todayLocal);
-    bool hasToday = todayRec is not null;
-    int? todayMinutes = todayRec?.DurationMinutes;
-
-    return Results.Ok(new StatsDto(
-        CompletedThisMonth: completedThisMonth,
-        CompletedTotal: completedTotal,
-        LongestStreak: longest,
-        TotalDurationMinutes: totalDurationMinutes,
-        DurationThisMonth: durationThisMonth,
-        HasTodayCheckIn: hasToday,
-        TodayDurationMinutes: todayMinutes
-    ));
+    var stats = await repo.GetStatsAsync(id, month, tz);
+    return stats is null ? Results.NotFound() : Results.Ok(stats);
 });
 
 app.Run();

@@ -21,3 +21,8 @@ public record StatsDto(
     bool HasTodayCheckIn,
     int? TodayDurationMinutes
 );
+
+public record CheckInPointDto(
+    string Date,
+    int Minutes
+);
