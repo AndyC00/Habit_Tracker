@@ -27,6 +27,10 @@ jobs:
           cache-dependency-path: 'frontend/package-lock.json'
 
       - name: Install & Build
+        env:
+          # Set this repository secret to your public HTTPS API base, e.g. https://api.example.com
+          # If not set, Vite will fall back to frontend/.env.production (placeholder)
+          VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
         run: |
           cd "frontend"
           npm ci
@@ -45,4 +49,3 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
-
