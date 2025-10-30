@@ -1,6 +1,19 @@
-// store the data in browser localStorage for now
-// will migrate to server AWS cloud or Google cloud later
-const NS = "habittracker:v1"; // namespace for the localStorage
+// Firebase-backed store (no auth for now).
+// Data is partitioned per device via a local clientId.
+import { getFirebase, getClientId } from "./firebase";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+
+const NS = "habittracker:v1"; // reserved for local backup/export
 
 export type Habit = {
   id: number;
@@ -15,7 +28,7 @@ export type Habit = {
 export type CheckIn = {
   id: number;
   habitId: number;
-  localDate: string;          // yyyy-MM-dd
+  localDate: string; // yyyy-MM-dd
   durationMinutes?: number | null;
   createdUtc?: string;
 };
@@ -30,60 +43,26 @@ export type Stats = {
   todayDurationMinutes: number | null;
 };
 
-type DB = {
-  version: 1;
-  nextHabitId: number;
-  nextCheckInId: number;
-  habits: Habit[];
-  checkins: CheckIn[];
-};
-
-function loadDB(): DB {
-  const raw = localStorage.getItem(NS);
-  if (!raw) {
-    const empty: DB = {
-      version: 1,
-      nextHabitId: 1,
-      nextCheckInId: 1,
-      habits: [],
-      checkins: []
-    };
-    localStorage.setItem(NS, JSON.stringify(empty));
-    return empty;
-  }
-  try {
-    return JSON.parse(raw) as DB;
-  } 
-  catch {
-    const reset: DB = {
-      version: 1,
-      nextHabitId: 1,
-      nextCheckInId: 1,
-      habits: [],
-      checkins: []
-    };
-    localStorage.setItem(NS, JSON.stringify(reset));
-    return reset;
-  }
+// ---------- helpers ----------
+function habitsColPath(clientId: string) {
+  return ["users", clientId, "habits"] as const;
+}
+function checkinsColPath(clientId: string) {
+  return ["users", clientId, "checkins"] as const;
 }
 
-function saveDB(db: DB) {
-  localStorage.setItem(NS, JSON.stringify(db));
-}
-
-// ---------- date helper functions ----------
 function todayInTZISO(tz?: string): string {
   const timeZone = tz || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
     month: "2-digit",
-    day: "2-digit"
+    day: "2-digit",
   }).formatToParts(new Date());
 
-  const y = parts.find(p => p.type === "year")!.value;
-  const m = parts.find(p => p.type === "month")!.value;
-  const d = parts.find(p => p.type === "day")!.value;
+  const y = parts.find((p) => p.type === "year")!.value;
+  const m = parts.find((p) => p.type === "month")!.value;
+  const d = parts.find((p) => p.type === "day")!.value;
 
   return `${y}-${m}-${d}`;
 }
@@ -103,10 +82,14 @@ function addDaysISO(iso: string, delta: number): string {
 
 // ---------- Habit ----------
 export async function listHabits(includeArchived = false): Promise<Habit[]> {
-  const db = loadDB();
-  const list = includeArchived ? db.habits : db.habits.filter(h => !h.isArchived);
-
-  return list.sort((a, b) => Number(a.isArchived) - Number(b.isArchived) || a.id - b.id);
+  const { db } = getFirebase();
+  const clientId = getClientId();
+  const snap = await getDocs(collection(db, ...habitsColPath(clientId)));
+  const all = snap.docs.map((d) => d.data() as Habit);
+  const list = includeArchived ? all : all.filter((h) => !h.isArchived);
+  return list.sort(
+    (a, b) => Number(a.isArchived) - Number(b.isArchived) || a.id - b.id,
+  );
 }
 
 export async function createHabit(payload: {
@@ -116,55 +99,69 @@ export async function createHabit(payload: {
   iconKey?: string | null;
 }): Promise<Habit> {
   if (!payload.name?.trim()) throw new Error("Name is required.");
-  
-  const db = loadDB();
+
+  const existing = await listHabits(true);
+  const nextId = existing.length
+    ? Math.max(...existing.map((h) => h.id)) + 1
+    : 1;
+
   const habit: Habit = {
-    id: db.nextHabitId++,
+    id: nextId,
     name: payload.name.trim(),
     description: payload.description ?? null,
     colorHex: payload.colorHex ?? null,
     iconKey: payload.iconKey ?? null,
     isArchived: false,
-    createdUtc: new Date().toISOString()
+    createdUtc: new Date().toISOString(),
   };
 
-  db.habits.push(habit);
-  saveDB(db);
-
+  const { db } = getFirebase();
+  const clientId = getClientId();
+  await setDoc(doc(db, ...habitsColPath(clientId), String(habit.id)), habit);
   return habit;
 }
 
-export async function updateHabit(id: number, payload: {
-  name: string;
-  description?: string | null;
-  colorHex?: string | null;
-  iconKey?: string | null;
-  isArchived: boolean;
-}): Promise<Habit> {
-  const db = loadDB();
-  const h = db.habits.find(x => x.id === id);
-
+export async function updateHabit(
+  id: number,
+  payload: {
+    name: string;
+    description?: string | null;
+    colorHex?: string | null;
+    iconKey?: string | null;
+    isArchived: boolean;
+  },
+): Promise<Habit> {
+  const { db } = getFirebase();
+  const clientId = getClientId();
+  const ref = doc(db, ...habitsColPath(clientId), String(id));
+  const snap = await getDoc(ref);
+  const h = snap.exists() ? (snap.data() as Habit) : null;
   if (!h) throw new Error("Habit not found.");
   if (!payload.name?.trim()) throw new Error("Name is required.");
-  
-  h.name = payload.name.trim();
-  h.description = payload.description ?? null;
-  h.colorHex = payload.colorHex ?? null;
-  h.iconKey = payload.iconKey ?? null;
-  h.isArchived = !!payload.isArchived;
-  saveDB(db);
 
-  return h;
+  const updated: Habit = {
+    ...h,
+    name: payload.name.trim(),
+    description: payload.description ?? null,
+    colorHex: payload.colorHex ?? null,
+    iconKey: payload.iconKey ?? null,
+    isArchived: !!payload.isArchived,
+  };
+  await setDoc(ref, updated, { merge: true });
+  return updated;
 }
 
 // ---------- Check-in ----------
 export async function upsertCheckIn(
   habitId: number,
-  body: { localDate: string; durationMinutes?: number | null; userTimeZoneIana?: string }
+  body: { localDate: string; durationMinutes?: number | null; userTimeZoneIana?: string },
 ): Promise<CheckIn> {
-  const db = loadDB();
-  const habit = db.habits.find(h => h.id === habitId);
-  if (!habit) throw new Error("Habit not found.");
+  const { db } = getFirebase();
+  const clientId = getClientId();
+
+  // ensure habit exists
+  const habitSnap = await getDoc(doc(db, ...habitsColPath(clientId), String(habitId)));
+  if (!habitSnap.exists()) throw new Error("Habit not found.");
 
   const tz = body.userTimeZoneIana || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const today = todayInTZISO(tz);
@@ -174,43 +171,51 @@ export async function upsertCheckIn(
     throw new Error(`Only the last 7 days (including today ${today}) are allowed.`);
   }
 
-  const existing = db.checkins.find(c => c.habitId === habitId && c.localDate === body.localDate);
-  if (existing) {
-    existing.durationMinutes = body.durationMinutes ?? null;
-    saveDB(db);
-    return existing;
-  }
-
-  const check: CheckIn = {
-    id: db.nextCheckInId++,
-    habitId,
-    localDate: body.localDate,
+  const checkId = `${habitId}_${body.localDate}`;
+  const ref = doc(db, ...checkinsColPath(clientId), checkId);
+  const snap = await getDoc(ref);
+  const base: CheckIn = snap.exists()
+    ? (snap.data() as CheckIn)
+    : {
+        // deterministic numeric id for compatibility
+        id: parseInt(`${habitId}${body.localDate.replace(/-/g, "")}`, 10),
+        habitId,
+        localDate: body.localDate,
+        durationMinutes: null,
+        createdUtc: new Date().toISOString(),
+      };
+  const updated: CheckIn = {
+    ...base,
     durationMinutes: body.durationMinutes ?? null,
-    createdUtc: new Date().toISOString()
   };
-  db.checkins.push(check);
-  saveDB(db);
-  return check;
+  await setDoc(ref, updated);
+  return updated;
 }
 
 export async function deleteCheckIn(habitId: number, localDate: string): Promise<void> {
-  const db = loadDB();
-  const idx = db.checkins.findIndex(c => c.habitId === habitId && c.localDate === localDate);
-  
-  if (idx >= 0) {
-    db.checkins.splice(idx, 1);
-    saveDB(db);
-  } 
-  else {
-    throw new Error("No check-in on that date.");
-  }
+  const { db } = getFirebase();
+  const clientId = getClientId();
+  const ref = doc(db, ...checkinsColPath(clientId), `${habitId}_${localDate}`);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error("No check-in on that date.");
+  await deleteDoc(ref);
 }
 
 // ---------- Stats ----------
-export async function getStats(habitId: number, month?: string, tz?: string): Promise<Stats> {
-  const db = loadDB();
-  const checks = db.checkins
-    .filter(c => c.habitId === habitId)
+export async function getStats(
+  habitId: number,
+  month?: string,
+  tz?: string,
+): Promise<Stats> {
+  const { db } = getFirebase();
+  const clientId = getClientId();
+  const q = query(
+    collection(db, ...checkinsColPath(clientId)),
+    where("habitId", "==", habitId),
+  );
+  const snap = await getDocs(q);
+  const checks = snap.docs
+    .map((d) => d.data() as CheckIn)
     .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0));
 
   const completedTotal = checks.length;
@@ -227,7 +232,8 @@ export async function getStats(habitId: number, month?: string, tz?: string): Pr
     }
   }
 
-  let longest = 0, current = 0;
+  let longest = 0,
+    current = 0;
   let prev: string | null = null;
   for (const c of checks) {
     if (prev === null) {
@@ -237,11 +243,9 @@ export async function getStats(habitId: number, month?: string, tz?: string): Pr
       const curDays = isoToEpochDays(c.localDate);
       if (curDays === prevDays) {
         continue;
-      } 
-      else if (curDays === prevDays + 1) {
+      } else if (curDays === prevDays + 1) {
         current++;
-      } 
-      else {
+      } else {
         current = 1;
       }
     }
@@ -249,10 +253,13 @@ export async function getStats(habitId: number, month?: string, tz?: string): Pr
     prev = c.localDate;
   }
 
-  const totalDurationMinutes = checks.reduce((sum, c) => sum + (c.durationMinutes ?? 0), 0);
+  const totalDurationMinutes = checks.reduce(
+    (sum, c) => sum + (c.durationMinutes ?? 0),
+    0,
+  );
 
   const today = todayInTZISO(tz);
-  const todayRec = checks.find(c => c.localDate === today);
+  const todayRec = checks.find((c) => c.localDate === today);
   const hasTodayCheckIn = !!todayRec;
   const todayDurationMinutes = todayRec?.durationMinutes ?? null;
 
@@ -263,7 +270,7 @@ export async function getStats(habitId: number, month?: string, tz?: string): Pr
     totalDurationMinutes,
     durationThisMonth,
     hasTodayCheckIn,
-    todayDurationMinutes
+    todayDurationMinutes,
   };
 }
 
@@ -271,11 +278,17 @@ export async function getStats(habitId: number, month?: string, tz?: string): Pr
 export async function getRecentSeries(
   habitId: number,
   days: number,
-  tz?: string
+  tz?: string,
 ): Promise<{ date: string; minutes: number }[]> {
-  const db = loadDB();
-  const checks = db.checkins
-    .filter((c) => c.habitId === habitId)
+  const { db } = getFirebase();
+  const clientId = getClientId();
+  const q = query(
+    collection(db, ...checkinsColPath(clientId)),
+    where("habitId", "==", habitId),
+  );
+  const snap = await getDocs(q);
+  const checks = snap.docs
+    .map((d) => d.data() as CheckIn)
     .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0));
 
   const latest = checks.length > 0 ? checks[checks.length - 1].localDate : todayInTZISO(tz);
@@ -298,11 +311,17 @@ export async function getRecentSeries(
 
 export async function getMonthSeries(
   habitId: number,
-  tz?: string
+  tz?: string,
 ): Promise<{ date: string; minutes: number }[]> {
-  const db = loadDB();
-  const checks = db.checkins
-    .filter((c) => c.habitId === habitId)
+  const { db } = getFirebase();
+  const clientId = getClientId();
+  const q = query(
+    collection(db, ...checkinsColPath(clientId)),
+    where("habitId", "==", habitId),
+  );
+  const snap = await getDocs(q);
+  const checks = snap.docs
+    .map((d) => d.data() as CheckIn)
     .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0));
 
   const latest = checks.length > 0 ? checks[checks.length - 1].localDate : todayInTZISO(tz);
@@ -336,12 +355,18 @@ export async function getMonthSeries(
 
 export async function getTotalSeries(
   habitId: number,
-  tz?: string
+  tz?: string,
 ): Promise<{ date: string; minutes: number }[]> {
   void tz; // intentionally read to keep API compatibility
-  const db = loadDB();
-  const checks = db.checkins
-    .filter((c) => c.habitId === habitId)
+  const { db } = getFirebase();
+  const clientId = getClientId();
+  const q = query(
+    collection(db, ...checkinsColPath(clientId)),
+    where("habitId", "==", habitId),
+  );
+  const snap = await getDocs(q);
+  const checks = snap.docs
+    .map((d) => d.data() as CheckIn)
     .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0));
 
   if (checks.length === 0) return [];
@@ -365,11 +390,39 @@ export async function getTotalSeries(
   return points; // oldest -> newest over full range
 }
 
-// ---------- export/import for backup (future use) ----------
+// ---------- export/import for backup (local only) ----------
 export function exportJson(): string {
   return localStorage.getItem(NS) ?? "";
 }
 
 export function importJson(json: string) {
   localStorage.setItem(NS, json);
+}
+
+// Optional: one-time migration from local backup JSON (NS) to Firestore
+// Call this manually in dev console if needed: await store.migrateLocalBackupToCloud()
+export async function migrateLocalBackupToCloud(): Promise<{ habits: number; checkins: number }> {
+  const raw = localStorage.getItem(NS);
+  if (!raw) return { habits: 0, checkins: 0 };
+  try {
+    const parsed = JSON.parse(raw) as {
+      habits?: Habit[];
+      checkins?: CheckIn[];
+    };
+    const { db } = getFirebase();
+    const clientId = getClientId();
+    let h = 0, c = 0;
+    for (const it of parsed.habits || []) {
+      await setDoc(doc(db, ...habitsColPath(clientId), String(it.id)), it, { merge: true });
+      h++;
+    }
+    for (const it of parsed.checkins || []) {
+      const cid = `${it.habitId}_${it.localDate}`;
+      await setDoc(doc(db, ...checkinsColPath(clientId), cid), it, { merge: true });
+      c++;
+    }
+    return { habits: h, checkins: c };
+  } catch {
+    return { habits: 0, checkins: 0 };
+  }
 }
