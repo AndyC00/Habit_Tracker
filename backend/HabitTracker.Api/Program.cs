@@ -3,6 +3,7 @@ using HabitTracker.Api.Services;
 using HabitTracker.Api.Utils;
 using Google.Cloud.Firestore;
 using Google.Apis.Auth.OAuth2;
+using System.IO;
 using System.Text.Json.Serialization;
 
 // --------------------- Preliminary setup ---------------------
@@ -31,6 +32,29 @@ builder.Services.AddSingleton(provider =>
 {
     var projectId = builder.Configuration["FIREBASE_PROJECT_ID"] ?? Environment.GetEnvironmentVariable("FIREBASE_PROJECT_ID") ?? "habittracker-database";
     var credPath = builder.Configuration["GOOGLE_APPLICATION_CREDENTIALS"] ?? Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
+    if (string.IsNullOrWhiteSpace(credPath))
+    {
+        // Fallback search: look for a JSON key under a nearby 'secrets' folder
+        // Check ./secrets, ../secrets, ../../secrets in order (backend project is nested under repo)
+        var roots = new[]
+        {
+            builder.Environment.ContentRootPath,
+            Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..")),
+            Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", ".."))
+        };
+        foreach (var r in roots.Distinct())
+        {
+            var dir = Path.Combine(r, "secrets");
+            if (!Directory.Exists(dir)) continue;
+            // Prefer a conventional filename if present
+            var preferred = Path.Combine(dir, "GOOGLE_APPLICATION_CREDENTIALS.json");
+            if (File.Exists(preferred)) { credPath = preferred; break; }
+            var alt = Directory.GetFiles(dir, "*firebase-adminsdk*.json").FirstOrDefault();
+            if (!string.IsNullOrEmpty(alt)) { credPath = alt; break; }
+            var any = Directory.GetFiles(dir, "*.json").FirstOrDefault();
+            if (!string.IsNullOrEmpty(any)) { credPath = any; break; }
+        }
+    }
 
     var builderDb = new FirestoreDbBuilder { ProjectId = projectId };
     if (!string.IsNullOrWhiteSpace(credPath) && File.Exists(credPath))
