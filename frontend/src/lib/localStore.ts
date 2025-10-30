@@ -210,6 +210,9 @@ export async function getTotalSeries(
   habitId: number,
   tz?: string,
 ): Promise<{ date: string; minutes: number }[]> {
+  // Intentionally unused: keep param for API symmetry with other functions
+  void tz;
+
   const points = await http<{ date: string; minutes: number }[]>(`/api/habits/${habitId}/checkins`);
   const checks = points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
