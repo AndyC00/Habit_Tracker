@@ -64,6 +64,7 @@ function addDaysISO(iso: string, delta: number): string {
 
 // ---------- Habit ----------
 export async function listHabits(includeArchived = false): Promise<Habit[]> {
+  getFirebase();
   await authReady;
   const { db } = getFirebase();
   const scope = getScopeId();
