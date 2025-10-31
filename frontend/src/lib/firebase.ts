@@ -32,11 +32,16 @@ export function getFirebase() {
       const a = getAuth(app);
       auth = a;
       onAuthStateChanged(a, (user) => {
-        if (!user) signInAnonymously(a).catch(() => {});
-        if (resolveAuthReady) resolveAuthReady();
+        if (user) {
+          if (resolveAuthReady) {
+            resolveAuthReady();
+            resolveAuthReady = null;
+          }
+        } else {
+          // No user yet: start anonymous sign-in, and wait for the next auth state
+          signInAnonymously(a).catch(() => {});
+        }
       });
-      // kick it off in case there's no current user
-      signInAnonymously(a).catch(() => {});
     }
   }
   return { app, db, auth };
