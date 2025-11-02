@@ -136,9 +136,7 @@ export default function App() {
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [archivedHabits, setArchivedHabits] = useState<Habit[]>([]);
   const [archivedStatsById, setArchivedStatsById] = useState<Record<number, Stats | undefined>>({});
-  const [weekChartForId, setWeekChartForId] = useState<number | null>(null);
-  const [monthChartForId, setMonthChartForId] = useState<number | null>(null);
-  const [totalChartForId, setTotalChartForId] = useState<number | null>(null);
+  const [openChart, setOpenChart] = useState<null | { type: 'week' | 'month' | 'total'; habitId: number }>(null);
 
   const defaultFormValues: HabitFormValues = {
     name: "",
@@ -432,39 +430,43 @@ export default function App() {
                 <div className="row" style={{ marginTop: 8 }}>
                   <button
                     className="btn"
-                    onClick={() => setWeekChartForId((cur) => (cur === h.id ? null : h.id))}
+                    onClick={() => setOpenChart((cur) => (cur && cur.type === 'week' && cur.habitId === h.id ? null : { type: 'week', habitId: h.id }))}
                   >
                     Week Statistic
                   </button>
                   <button
                     className="btn"
                     style={{ marginLeft: 8 }}
-                    onClick={() => setMonthChartForId((cur) => (cur === h.id ? null : h.id))}
+                    onClick={() => setOpenChart((cur) => (cur && cur.type === 'month' && cur.habitId === h.id ? null : { type: 'month', habitId: h.id }))}
                   >
                     Month Statistic
                   </button>
                   <button
                     className="btn"
                     style={{ marginLeft: 8 }}
-                    onClick={() => setTotalChartForId((cur) => (cur === h.id ? null : h.id))}
+                    onClick={() => setOpenChart((cur) => (cur && cur.type === 'total' && cur.habitId === h.id ? null : { type: 'total', habitId: h.id }))}
                   >
                     Total Statistic
                   </button>
                 </div>
               </div>
-              {weekChartForId === h.id && (
-                <div style={{ marginTop: 12 }}>
-                  <WeekChart habitId={h.id} />
-                </div>
-              )}
-              {monthChartForId === h.id && (
-                <div style={{ marginTop: 12 }}>
-                  <MonthChart habitId={h.id} />
-                </div>
-              )}
-              {totalChartForId === h.id && (
-                <div style={{ marginTop: 12 }}>
-                  <TotalChart habitId={h.id} />
+              {openChart?.habitId === h.id && (
+                <div
+                  className="habit-chart-overlay"
+                  role="presentation"
+                  onClick={() => setOpenChart(null)}
+                >
+                  <button
+                    className="habit-chart-close"
+                    onClick={(e) => { e.stopPropagation(); setOpenChart(null); }}
+                  >
+                    Close
+                  </button>
+                  <div className="habit-chart-inner" onClick={(e) => e.stopPropagation()}>
+                    {openChart.type === 'week' && <WeekChart habitId={h.id} />}
+                    {openChart.type === 'month' && <MonthChart habitId={h.id} />}
+                    {openChart.type === 'total' && <TotalChart habitId={h.id} />}
+                  </div>
                 </div>
               )}
             </li>
