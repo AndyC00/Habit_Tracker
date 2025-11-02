@@ -399,7 +399,7 @@ export default function App() {
                     placeholder="optional"
                   />
                   <button
-                    className="btn"
+                    className={`btn ${stats?.hasTodayCheckIn ? "operation" : ""}`}
                     disabled={pendingId === h.id}
                     onClick={() => checkIn(h.id)}
                     title={stats?.hasTodayCheckIn ? "Update today's minutes" : "Check-in today"}
@@ -412,7 +412,7 @@ export default function App() {
                   </button>
 
                   <button
-                    className="btn"
+                    className="btn operation"
                     disabled={pendingId === h.id || !stats?.hasTodayCheckIn}
                     onClick={() => undoToday(h.id)}
                     style={{ marginLeft: 8 }}
@@ -420,7 +420,7 @@ export default function App() {
                     Undo Today
                   </button>
                   <button
-                    className="btn"
+                    className="btn operation"
                     onClick={() => openEditForm(h)}
                     style={{ marginLeft: 8 }}
                   >
@@ -429,20 +429,20 @@ export default function App() {
                 </div>
                 <div className="row" style={{ marginTop: 8 }}>
                   <button
-                    className="btn"
+                    className="btn stats"
                     onClick={() => setOpenChart((cur) => (cur && cur.type === 'week' && cur.habitId === h.id ? null : { type: 'week', habitId: h.id }))}
                   >
                     Week Statistic
                   </button>
                   <button
-                    className="btn"
+                    className="btn stats"
                     style={{ marginLeft: 8 }}
                     onClick={() => setOpenChart((cur) => (cur && cur.type === 'month' && cur.habitId === h.id ? null : { type: 'month', habitId: h.id }))}
                   >
                     Month Statistic
                   </button>
                   <button
-                    className="btn"
+                    className="btn stats"
                     style={{ marginLeft: 8 }}
                     onClick={() => setOpenChart((cur) => (cur && cur.type === 'total' && cur.habitId === h.id ? null : { type: 'total', habitId: h.id }))}
                   >
@@ -456,16 +456,16 @@ export default function App() {
                   role="presentation"
                   onClick={() => setOpenChart(null)}
                 >
-                  <button
-                    className="habit-chart-close"
-                    onClick={(e) => { e.stopPropagation(); setOpenChart(null); }}
-                  >
-                    Close
-                  </button>
                   <div className="habit-chart-inner" onClick={(e) => e.stopPropagation()}>
                     {openChart.type === 'week' && <WeekChart habitId={h.id} />}
                     {openChart.type === 'month' && <MonthChart habitId={h.id} />}
                     {openChart.type === 'total' && <TotalChart habitId={h.id} />}
+                    <button
+                      className="habit-chart-close"
+                      onClick={(e) => { e.stopPropagation(); setOpenChart(null); }}
+                    >
+                      Close
+                    </button>
                   </div>
                 </div>
               )}
