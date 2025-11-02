@@ -27,45 +27,73 @@ builder.Services.AddCors(opt =>
         .AllowAnyOrigin());
 });
 
-// Firestore
-builder.Services.AddSingleton(provider =>
+// Data store selection: prefer in-memory repo for local/dev testing when Firebase is disabled.
+bool UseInMemoryRepo()
 {
-    var projectId = builder.Configuration["FIREBASE_PROJECT_ID"] ?? Environment.GetEnvironmentVariable("FIREBASE_PROJECT_ID") ?? "habittracker-database";
-    var credPath = builder.Configuration["GOOGLE_APPLICATION_CREDENTIALS"] ?? Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
-    if (string.IsNullOrWhiteSpace(credPath))
-    {
-        // Fallback search: look for a JSON key under a nearby 'secrets' folder
-        // Check ./secrets, ../secrets, ../../secrets in order (backend project is nested under repo)
-        var roots = new[]
-        {
-            builder.Environment.ContentRootPath,
-            Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..")),
-            Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", ".."))
-        };
-        foreach (var r in roots.Distinct())
-        {
-            var dir = Path.Combine(r, "secrets");
-            if (!Directory.Exists(dir)) continue;
-            // Prefer a conventional filename if present
-            var preferred = Path.Combine(dir, "GOOGLE_APPLICATION_CREDENTIALS.json");
-            if (File.Exists(preferred)) { credPath = preferred; break; }
-            var alt = Directory.GetFiles(dir, "*firebase-adminsdk*.json").FirstOrDefault();
-            if (!string.IsNullOrEmpty(alt)) { credPath = alt; break; }
-            var any = Directory.GetFiles(dir, "*.json").FirstOrDefault();
-            if (!string.IsNullOrEmpty(any)) { credPath = any; break; }
-        }
-    }
+    static bool IsTrue(string? v) => !string.IsNullOrWhiteSpace(v) && v.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
 
-    var builderDb = new FirestoreDbBuilder { ProjectId = projectId };
-    if (!string.IsNullOrWhiteSpace(credPath) && File.Exists(credPath))
+    var cfg = builder.Configuration;
+    var env = builder.Environment;
+
+    var useInMemFlag = IsTrue(cfg["USE_INMEMORY_REPO"]) || IsTrue(Environment.GetEnvironmentVariable("USE_INMEMORY_REPO"));
+    var disableFirebaseFlag = IsTrue(cfg["DISABLE_FIREBASE"]) || IsTrue(Environment.GetEnvironmentVariable("DISABLE_FIREBASE"));
+
+    // If explicitly requested, or firebase is disabled, use in-memory
+    if (useInMemFlag || disableFirebaseFlag) return true;
+
+    // If in Development and no credentials are available, default to in-memory for convenience
+    var credPath = cfg["GOOGLE_APPLICATION_CREDENTIALS"] ?? Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
+    if (env.IsDevelopment() && string.IsNullOrWhiteSpace(credPath)) return true;
+
+    return false;
+}
+
+if (UseInMemoryRepo())
+{
+    builder.Services.AddSingleton<IFirestoreRepo, InMemoryRepo>();
+}
+else
+{
+    // Firestore
+    builder.Services.AddSingleton(provider =>
     {
-        // Load explicit credentials from JSON file when provided
-        builderDb.Credential = GoogleCredential.FromFile(credPath);
-    }
-    // Otherwise rely on ADC (gcloud auth application-default login, or platform identity)
-    return builderDb.Build();
-});
-builder.Services.AddSingleton<IFirestoreRepo, FirestoreRepo>();
+        var projectId = builder.Configuration["FIREBASE_PROJECT_ID"] ?? Environment.GetEnvironmentVariable("FIREBASE_PROJECT_ID") ?? "habittracker-database";
+        var credPath = builder.Configuration["GOOGLE_APPLICATION_CREDENTIALS"] ?? Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
+        if (string.IsNullOrWhiteSpace(credPath))
+        {
+            // Fallback search: look for a JSON key under a nearby 'secrets' folder
+            // Check ./secrets, ../secrets, ../../secrets in order (backend project is nested under repo)
+            var roots = new[]
+            {
+                builder.Environment.ContentRootPath,
+                Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..")),
+                Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", ".."))
+            };
+            foreach (var r in roots.Distinct())
+            {
+                var dir = Path.Combine(r, "secrets");
+                if (!Directory.Exists(dir)) continue;
+                // Prefer a conventional filename if present
+                var preferred = Path.Combine(dir, "GOOGLE_APPLICATION_CREDENTIALS.json");
+                if (File.Exists(preferred)) { credPath = preferred; break; }
+                var alt = Directory.GetFiles(dir, "*firebase-adminsdk*.json").FirstOrDefault();
+                if (!string.IsNullOrEmpty(alt)) { credPath = alt; break; }
+                var any = Directory.GetFiles(dir, "*.json").FirstOrDefault();
+                if (!string.IsNullOrEmpty(any)) { credPath = any; break; }
+            }
+        }
+
+        var builderDb = new FirestoreDbBuilder { ProjectId = projectId };
+        if (!string.IsNullOrWhiteSpace(credPath) && File.Exists(credPath))
+        {
+            // Load explicit credentials from JSON file when provided
+            builderDb.Credential = GoogleCredential.FromFile(credPath);
+        }
+        // Otherwise rely on ADC (gcloud auth application-default login, or platform identity)
+        return builderDb.Build();
+    });
+    builder.Services.AddSingleton<IFirestoreRepo, FirestoreRepo>();
+}
 
 // build app and middleware pipeline
 var app = builder.Build();
