@@ -1,9 +1,8 @@
 // Firebase-backed store in frontend (optional anon auth)
 import { getFirebase, getScopeId, authReady } from "./firebase";
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
-import { http } from "./http";
 
-const NS = "habittracker:v1"; // keep for optional local export/import if needed
+const NS = "habittracker:v1"; // localStorage namespace (dev only)
 
 export type Habit = {
   id: number;
@@ -33,7 +32,37 @@ export type Stats = {
   todayDurationMinutes: number | null;
 };
 
-const USE_LOCAL_API = (import.meta.env.VITE_USE_LOCAL_API || "").toLowerCase() === "true";
+// Use in-browser localStorage only when accessed from Vite dev server
+const USE_LOCAL_STORAGE =
+  typeof window !== "undefined" && window.location.origin === "http://localhost:5173";
+
+type DB = {
+  version: 1;
+  nextHabitId: number;
+  nextCheckInId: number;
+  habits: Habit[];
+  checkins: CheckIn[];
+};
+
+function loadDB(): DB {
+  const raw = localStorage.getItem(NS);
+  if (!raw) {
+    const empty: DB = { version: 1, nextHabitId: 1, nextCheckInId: 1, habits: [], checkins: [] };
+    localStorage.setItem(NS, JSON.stringify(empty));
+    return empty;
+  }
+  try {
+    return JSON.parse(raw) as DB;
+  } catch {
+    const reset: DB = { version: 1, nextHabitId: 1, nextCheckInId: 1, habits: [], checkins: [] };
+    localStorage.setItem(NS, JSON.stringify(reset));
+    return reset;
+  }
+}
+
+function saveDB(db: DB) {
+  localStorage.setItem(NS, JSON.stringify(db));
+}
 
 // ---------- helpers ----------
 function todayInTZISO(tz?: string): string {
@@ -67,9 +96,10 @@ function addDaysISO(iso: string, delta: number): string {
 
 // ---------- Habit ----------
 export async function listHabits(includeArchived = false): Promise<Habit[]> {
-  if (USE_LOCAL_API) {
-    const list = await http<Habit[]>(`/api/habits${includeArchived ? "?includeArchived=true" : ""}`);
-    return list;
+  if (USE_LOCAL_STORAGE) {
+    const db = loadDB();
+    const list = includeArchived ? db.habits : db.habits.filter((h) => !h.isArchived);
+    return list.sort((a, b) => Number(a.isArchived) - Number(b.isArchived) || a.id - b.id);
   } else {
     getFirebase();
     await authReady;
@@ -89,16 +119,20 @@ export async function createHabit(payload: {
   iconKey?: string | null;
 }): Promise<Habit> {
   if (!payload.name?.trim()) throw new Error("Name is required.");
-  if (USE_LOCAL_API) {
-    return await http<Habit>("/api/habits", {
-      method: "POST",
-      body: JSON.stringify({
-        name: payload.name,
-        description: payload.description,
-        colorHex: payload.colorHex,
-        iconKey: payload.iconKey,
-      }),
-    });
+  if (USE_LOCAL_STORAGE) {
+    const db = loadDB();
+    const habit: Habit = {
+      id: db.nextHabitId++,
+      name: payload.name.trim(),
+      description: payload.description ?? null,
+      colorHex: payload.colorHex ?? null,
+      iconKey: payload.iconKey ?? null,
+      isArchived: false,
+      createdUtc: new Date().toISOString(),
+    };
+    db.habits.push(habit);
+    saveDB(db);
+    return habit;
   } else {
     await authReady;
     const { db } = getFirebase();
@@ -129,11 +163,17 @@ export async function updateHabit(
     isArchived: boolean;
   },
 ): Promise<Habit> {
-  if (USE_LOCAL_API) {
-    return await http<Habit>(`/api/habits/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    });
+  if (USE_LOCAL_STORAGE) {
+    const db = loadDB();
+    const h = db.habits.find((x) => x.id === id);
+    if (!h) throw new Error("Habit not found.");
+    h.name = payload.name.trim();
+    h.description = payload.description ?? null;
+    h.colorHex = payload.colorHex ?? null;
+    h.iconKey = payload.iconKey ?? null;
+    h.isArchived = !!payload.isArchived;
+    saveDB(db);
+    return h;
   } else {
     await authReady;
     const { db } = getFirebase();
@@ -160,16 +200,30 @@ export async function upsertCheckIn(
   habitId: number,
   body: { localDate: string; durationMinutes?: number | null; userTimeZoneIana?: string },
 ): Promise<CheckIn> {
-  if (USE_LOCAL_API) {
-    const payload = {
+  if (USE_LOCAL_STORAGE) {
+    const db = loadDB();
+    const tz = body.userTimeZoneIana || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const today = todayInTZISO(tz);
+    const min = addDaysISO(today, -7);
+    if (body.localDate < min || body.localDate > today) {
+      throw new Error(`Only the last 7 days (including today ${today}) are allowed.`);
+    }
+    const existing = db.checkins.find((c) => c.habitId === habitId && c.localDate === body.localDate);
+    if (existing) {
+      existing.durationMinutes = body.durationMinutes ?? null;
+      saveDB(db);
+      return existing;
+    }
+    const check: CheckIn = {
+      id: db.nextCheckInId++,
+      habitId,
       localDate: body.localDate,
       durationMinutes: body.durationMinutes ?? null,
-      userTimeZoneIana: body.userTimeZoneIana,
+      createdUtc: new Date().toISOString(),
     };
-    return await http<CheckIn>(`/api/habits/${habitId}/checkins`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    db.checkins.push(check);
+    saveDB(db);
+    return check;
   } else {
     await authReady;
     const { db } = getFirebase();
@@ -198,8 +252,15 @@ export async function upsertCheckIn(
 }
 
 export async function deleteCheckIn(habitId: number, localDate: string): Promise<void> {
-  if (USE_LOCAL_API) {
-    await http<void>(`/api/habits/${habitId}/checkins/${localDate}`, { method: "DELETE" });
+  if (USE_LOCAL_STORAGE) {
+    const db = loadDB();
+    const idx = db.checkins.findIndex((c) => c.habitId === habitId && c.localDate === localDate);
+    if (idx >= 0) {
+      db.checkins.splice(idx, 1);
+      saveDB(db);
+    } else {
+      throw new Error("No check-in on that date.");
+    }
   } else {
     await authReady;
     const { db } = getFirebase();
@@ -217,12 +278,53 @@ export async function getStats(
   month?: string,
   tz?: string,
 ): Promise<Stats> {
-  if (USE_LOCAL_API) {
-    const qs = new URLSearchParams();
-    if (month) qs.set("month", month);
-    if (tz) qs.set("tz", tz);
-    const url = `/api/habits/${habitId}/stats${qs.toString() ? `?${qs.toString()}` : ""}`;
-    return await http<Stats>(url);
+  if (USE_LOCAL_STORAGE) {
+    const db = loadDB();
+    const checks = db.checkins
+      .filter((c) => c.habitId === habitId)
+      .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0));
+
+    const completedTotal = checks.length;
+    let completedThisMonth = 0;
+    let durationThisMonth = 0;
+    if (month && month.length === 7) {
+      for (const c of checks) {
+        if (c.localDate.startsWith(month)) {
+          completedThisMonth++;
+          durationThisMonth += c.durationMinutes ?? 0;
+        }
+      }
+    }
+    let longest = 0,
+      current = 0;
+    let prev: string | null = null;
+    for (const c of checks) {
+      if (prev === null) current = 1;
+      else {
+        const prevDays = isoToEpochDays(prev);
+        const curDays = isoToEpochDays(c.localDate);
+        if (curDays === prevDays) continue;
+        else if (curDays === prevDays + 1) current++;
+        else current = 1;
+      }
+      longest = Math.max(longest, current);
+      prev = c.localDate;
+    }
+    const totalDurationMinutes = checks.reduce((sum, c) => sum + (c.durationMinutes ?? 0), 0);
+    const todayIso = todayInTZISO(tz);
+    const todayRec = checks.find((c) => c.localDate === todayIso);
+    const hasTodayCheckIn = !!todayRec;
+    const todayDurationMinutes = todayRec?.durationMinutes ?? null;
+
+    return {
+      completedThisMonth,
+      completedTotal,
+      longestStreak: longest,
+      totalDurationMinutes,
+      durationThisMonth,
+      hasTodayCheckIn,
+      todayDurationMinutes,
+    };
   } else {
     await authReady;
     const { db } = getFirebase();
@@ -276,9 +378,12 @@ export async function getRecentSeries(
   tz?: string,
 ): Promise<{ date: string; minutes: number }[]> {
   let sorted: { date: string; minutes: number }[];
-  if (USE_LOCAL_API) {
-    const points = await http<{ date: string; minutes: number }[]>(`/api/habits/${habitId}/checkins`);
-    sorted = points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  if (USE_LOCAL_STORAGE) {
+    const db = loadDB();
+    sorted = db.checkins
+      .filter((c) => c.habitId === habitId)
+      .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
+      .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
   } else {
     await authReady;
     const { db } = getFirebase();
@@ -312,9 +417,12 @@ export async function getMonthSeries(
   tz?: string,
 ): Promise<{ date: string; minutes: number }[]> {
   let all: { date: string; minutes: number }[];
-  if (USE_LOCAL_API) {
-    const points = await http<{ date: string; minutes: number }[]>(`/api/habits/${habitId}/checkins`);
-    all = points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  if (USE_LOCAL_STORAGE) {
+    const db = loadDB();
+    all = db.checkins
+      .filter((c) => c.habitId === habitId)
+      .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
+      .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
   } else {
     await authReady;
     const { db } = getFirebase();
@@ -357,9 +465,12 @@ export async function getTotalSeries(
 ): Promise<{ date: string; minutes: number }[]> {
   void tz; // maintain signature
   let checks: { date: string; minutes: number }[];
-  if (USE_LOCAL_API) {
-    const points = await http<{ date: string; minutes: number }[]>(`/api/habits/${habitId}/checkins`);
-    checks = points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  if (USE_LOCAL_STORAGE) {
+    const db = loadDB();
+    checks = db.checkins
+      .filter((c) => c.habitId === habitId)
+      .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
+      .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
   } else {
     await authReady;
     const { db } = getFirebase();
