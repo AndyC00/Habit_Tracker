@@ -53,7 +53,8 @@ function loadDB(): DB {
   }
   try {
     return JSON.parse(raw) as DB;
-  } catch {
+  }
+  catch {
     const reset: DB = { version: 1, nextHabitId: 1, nextCheckInId: 1, habits: [], checkins: [] };
     localStorage.setItem(NS, JSON.stringify(reset));
     return reset;
@@ -174,7 +175,8 @@ export async function updateHabit(
     h.isArchived = !!payload.isArchived;
     saveDB(db);
     return h;
-  } else {
+  } 
+  else {
     await authReady;
     const { db } = getFirebase();
     const scope = getScopeId();

@@ -399,7 +399,7 @@ export default function App() {
                     placeholder="optional"
                   />
                   <button
-                    className={`btn ${stats?.hasTodayCheckIn ? "operation" : ""}`}
+                    className="btn operation"
                     disabled={pendingId === h.id}
                     onClick={() => checkIn(h.id)}
                     title={stats?.hasTodayCheckIn ? "Update today's minutes" : "Check-in today"}
