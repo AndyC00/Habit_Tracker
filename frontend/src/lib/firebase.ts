@@ -1,6 +1,6 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
-import { getAuth, type Auth } from "firebase/auth";
+import { getAuth, onAuthStateChanged, signInAnonymously, type Auth } from "firebase/auth";
 
 let app: FirebaseApp;
 let db: Firestore;
@@ -9,9 +9,20 @@ let auth: Auth;
 const useAnonAuth = (import.meta.env.VITE_ENABLE_ANON_AUTH || "").toLowerCase() === "true";
 
 let authReady: Promise<void> = Promise.resolve();
-let resolveAuthReady: (() => void) | null = null;
 if (useAnonAuth) {
-  authReady = new Promise<void>((resolve) => (resolveAuthReady = resolve));
+  authReady = new Promise<void>((resolve) => {
+    const { auth } = getFirebase();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        unsubscribe();
+        resolve();
+      }
+    });
+    // Trigger anonymous sign-in if not already authenticated
+    signInAnonymously(auth).catch(() => {
+      // ignore; auth state listener will handle resolution when applicable
+    });
+  });
 }
 
 export function getFirebase() {
