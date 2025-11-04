@@ -1,10 +1,11 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import AuthGate from './AuthGate';
 import './style.css'
 
-const container =
-  document.getElementById('app') ??
+
+const container = document.getElementById('app') ??
   (() => {
     const el = document.createElement('div')
     el.id = 'app'
@@ -14,6 +15,8 @@ const container =
 
 createRoot(container).render(
   <React.StrictMode>
-    <App />
+    <AuthGate>
+      <App />
+    </AuthGate>
   </React.StrictMode>
 )

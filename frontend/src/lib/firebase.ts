@@ -1,10 +1,10 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
-import { getAuth, onAuthStateChanged, signInAnonymously, type Auth } from "firebase/auth";
+import { getAuth, type Auth } from "firebase/auth";
 
 let app: FirebaseApp;
 let db: Firestore;
-let auth: Auth | null = null;
+let auth: Auth;
 
 const useAnonAuth = (import.meta.env.VITE_ENABLE_ANON_AUTH || "").toLowerCase() === "true";
 
@@ -26,23 +26,8 @@ export function getFirebase() {
     } as const;
 
     app = initializeApp(config as any);
-    db = getFirestore(app);
-
-    if (useAnonAuth) {
-      const a = getAuth(app);
-      auth = a;
-      onAuthStateChanged(a, (user) => {
-        if (user) {
-          if (resolveAuthReady) {
-            resolveAuthReady();
-            resolveAuthReady = null;
-          }
-        } else {
-          // No user yet: start anonymous sign-in, and wait for the next auth state
-          signInAnonymously(a).catch(() => {});
-        }
-      });
-    }
+    db  = getFirestore(app);
+    auth = getAuth(app);
   }
   return { app, db, auth };
 }
@@ -50,17 +35,8 @@ export function getFirebase() {
 export { authReady };
 
 export function getScopeId(): string {
-  // Prefer authenticated uid, else fall back to per-device clientId (not secure)
-  if (useAnonAuth) {
-    const { auth } = getFirebase();
-    const uid = auth?.currentUser?.uid;
-    if (uid) return uid;
-  }
-  const key = "habittracker:clientId";
-  let id = localStorage.getItem(key);
-  if (!id) {
-    id = `c_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-    localStorage.setItem(key, id);
-  }
-  return id;
+  const { auth } = getFirebase();
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  return user.uid;
 }

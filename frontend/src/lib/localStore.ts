@@ -1,5 +1,5 @@
 // Firebase-backed store in frontend (optional anon auth)
-import { getFirebase, getScopeId, authReady } from "./firebase";
+import { getFirebase, authReady } from "./firebase";
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 
 const NS = "habittracker:v1"; // localStorage namespace (dev only)
@@ -43,6 +43,13 @@ type DB = {
   habits: Habit[];
   checkins: CheckIn[];
 };
+
+function getUid(): string {
+  const { auth } = getFirebase();
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  return user.uid;
+}
 
 function loadDB(): DB {
   const raw = localStorage.getItem(NS);
@@ -101,12 +108,13 @@ export async function listHabits(includeArchived = false): Promise<Habit[]> {
     const db = loadDB();
     const list = includeArchived ? db.habits : db.habits.filter((h) => !h.isArchived);
     return list.sort((a, b) => Number(a.isArchived) - Number(b.isArchived) || a.id - b.id);
-  } else {
+  } 
+  else {
     getFirebase();
     await authReady;
     const { db } = getFirebase();
-    const scope = getScopeId();
-    const snap = await getDocs(collection(db, "users", scope, "habits"));
+    const uid = getUid();
+    const snap = await getDocs(collection(db, "users", uid, "habits"));
     const all = snap.docs.map((d) => d.data() as Habit);
     const list = includeArchived ? all : all.filter((h) => !h.isArchived);
     return list.sort((a, b) => Number(a.isArchived) - Number(b.isArchived) || a.id - b.id);
@@ -134,10 +142,11 @@ export async function createHabit(payload: {
     db.habits.push(habit);
     saveDB(db);
     return habit;
-  } else {
+  } 
+  else {
     await authReady;
     const { db } = getFirebase();
-    const scope = getScopeId();
+    const uid = getUid();
     const existing = await listHabits(true);
     const nextId = existing.length ? Math.max(...existing.map((h) => h.id)) + 1 : 1;
     const habit: Habit = {
@@ -149,7 +158,7 @@ export async function createHabit(payload: {
       isArchived: false,
       createdUtc: new Date().toISOString(),
     };
-    await setDoc(doc(db, "users", scope, "habits", String(habit.id)), habit);
+    await setDoc(doc(db, "users", uid, "habits", String(habit.id)), habit);
     return habit;
   }
 }
@@ -179,8 +188,8 @@ export async function updateHabit(
   else {
     await authReady;
     const { db } = getFirebase();
-    const scope = getScopeId();
-    const ref = doc(db, "users", scope, "habits", String(id));
+    const uid = getUid();
+    const ref = doc(db, "users", uid, "habits", String(id));
     const snap = await getDoc(ref);
     const h = snap.exists() ? (snap.data() as Habit) : null;
     if (!h) throw new Error("Habit not found.");
@@ -226,17 +235,18 @@ export async function upsertCheckIn(
     db.checkins.push(check);
     saveDB(db);
     return check;
-  } else {
+  } 
+  else {
     await authReady;
     const { db } = getFirebase();
-    const scope = getScopeId();
+    const uid = getUid();
     const tz = body.userTimeZoneIana || Intl.DateTimeFormat().resolvedOptions().timeZone;
     const today = todayInTZISO(tz);
     const min = addDaysISO(today, -7);
     if (body.localDate < min || body.localDate > today) {
       throw new Error(`Only the last 7 days (including today ${today}) are allowed.`);
     }
-    const ref = doc(db, "users", scope, "checkins", `${habitId}_${body.localDate}`);
+    const ref = doc(db, "users", uid, "checkins", `${habitId}_${body.localDate}`);
     const snap = await getDoc(ref);
     const base: CheckIn = snap.exists()
       ? (snap.data() as CheckIn)
@@ -266,8 +276,8 @@ export async function deleteCheckIn(habitId: number, localDate: string): Promise
   } else {
     await authReady;
     const { db } = getFirebase();
-    const scope = getScopeId();
-    const ref = doc(db, "users", scope, "checkins", `${habitId}_${localDate}`);
+    const uid = getUid();
+    const ref = doc(db, "users", uid, "checkins", `${habitId}_${localDate}`);
     const snap = await getDoc(ref);
     if (!snap.exists()) throw new Error("No check-in on that date.");
     await deleteDoc(ref);
@@ -327,11 +337,12 @@ export async function getStats(
       hasTodayCheckIn,
       todayDurationMinutes,
     };
-  } else {
+  } 
+  else {
     await authReady;
     const { db } = getFirebase();
-    const scope = getScopeId();
-    const qy = query(collection(db, "users", scope, "checkins"), where("habitId", "==", habitId));
+    const uid = getUid();
+    const qy = query(collection(db, "users", uid, "checkins"), where("habitId", "==", habitId));
     const snap = await getDocs(qy);
     const checks = snap.docs
       .map((d) => d.data() as CheckIn)
@@ -386,11 +397,12 @@ export async function getRecentSeries(
       .filter((c) => c.habitId === habitId)
       .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
       .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
-  } else {
+  } 
+  else {
     await authReady;
     const { db } = getFirebase();
-    const scope = getScopeId();
-    const qy = query(collection(db, "users", scope, "checkins"), where("habitId", "==", habitId));
+    const uid = getUid();
+    const qy = query(collection(db, "users", uid, "checkins"), where("habitId", "==", habitId));
     const snap = await getDocs(qy);
     sorted = snap.docs
       .map((d) => d.data() as CheckIn)
@@ -425,11 +437,12 @@ export async function getMonthSeries(
       .filter((c) => c.habitId === habitId)
       .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
       .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
-  } else {
+  } 
+  else {
     await authReady;
     const { db } = getFirebase();
-    const scope = getScopeId();
-    const qy = query(collection(db, "users", scope, "checkins"), where("habitId", "==", habitId));
+    const uid = getUid();
+    const qy = query(collection(db, "users", uid, "checkins"), where("habitId", "==", habitId));
     const snap = await getDocs(qy);
     all = snap.docs
       .map((d) => d.data() as CheckIn)
@@ -473,11 +486,12 @@ export async function getTotalSeries(
       .filter((c) => c.habitId === habitId)
       .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
       .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
-  } else {
+  } 
+  else {
     await authReady;
     const { db } = getFirebase();
-    const scope = getScopeId();
-    const qy = query(collection(db, "users", scope, "checkins"), where("habitId", "==", habitId));
+    const uid = getUid();
+    const qy = query(collection(db, "users", uid, "checkins"), where("habitId", "==", habitId));
     const snap = await getDocs(qy);
     checks = snap.docs
       .map((d) => d.data() as CheckIn)
