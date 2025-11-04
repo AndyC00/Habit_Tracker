@@ -261,3 +261,102 @@
   color: #ff6b6b;
   font-weight: 600;
 }
+
+/* -------- Auth UI (login/register) -------- */
+.auth-container {
+  width: min(420px, 92vw);
+  margin: 12vh auto;
+  background: #1a1a1a;
+  color: inherit;
+  border: 1px solid #333;
+  border-radius: 14px;
+  padding: 24px 22px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.auth-container h2 {
+  margin: 0 0 12px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.auth-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth-container label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.auth-container input[type="email"],
+.auth-container input[type="password"] {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #3a3a3a;
+  background: #101010;
+  color: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.05s ease;
+}
+
+.auth-container input:focus {
+  border-color: #44b0de;
+  box-shadow: 0 0 0 3px rgba(68, 176, 222, 0.2);
+}
+
+.auth-container .error {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  color: #ffb4b4;
+  background: rgba(255, 77, 77, 0.12);
+  border: 1px solid rgba(255, 77, 77, 0.3);
+  border-radius: 10px;
+}
+
+.auth-container button[type="submit"] {
+  margin-top: 4px;
+  padding: 10px 14px;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, #2f7d32, #44b0de);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.08s ease, filter 0.15s ease, box-shadow 0.2s ease;
+}
+
+.auth-container button[type="submit"]:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 10px 22px rgba(68, 176, 222, 0.22);
+}
+
+.auth-container button[type="submit"]:active {
+  transform: translateY(1px);
+}
+
+.auth-container p {
+  margin-top: 12px;
+  text-align: center;
+  opacity: 0.9;
+}
+
+.auth-container p > button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 6px;
+  color: #44b0de;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.auth-container p > button:hover {
+  filter: brightness(1.1);
+}
