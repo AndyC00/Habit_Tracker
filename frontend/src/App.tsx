@@ -3,9 +3,10 @@ import type { FormEvent } from "react";
 import { Dumbbell, BookOpen, Droplet, Moon, Code, Music, Coffee, Target, Timer, Circle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import * as store from "./lib/localStore";  // future use import { http } from "./lib/http"; when changed to cloud
+import * as store from "./lib/localStore";
 import { WeekChart, MonthChart, TotalChart } from "./lib/LineCharts";
 
+import { logout } from "./lib/auth";
 
 // ------------------ constants and types ------------------
 type Habit = {
@@ -51,22 +52,14 @@ type IconKey = keyof typeof ICONS;
 const DEFAULT_ICON: LucideIcon = Circle;
 
 // ------------------ helper functions ------------------
-// async function http<T>(path: string, init?: RequestInit): Promise<T> {
-//   const raw = import.meta.env.VITE_API_BASE as string;
-//   if (!raw) throw new Error("VITE_API_BASE in .env is not set");
-//   const base = raw.replace(/\/+$/, "");
-
-//   const res = await fetch(`${base}${path}`, {
-//     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-//     ...init,
-//   });
-
-//   if (!res.ok) throw new Error(await res.text());
-
-//   if (res.status === 204) return undefined as T;
-
-//   return res.json();
-// }
+async function handleLogout() {
+  try {
+    await logout();
+  } 
+  catch (e) {
+    console.error(e);
+  }
+}
 
 function todayLocalISO(): string {
   const d = new Date();
@@ -75,9 +68,6 @@ function todayLocalISO(): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
-// const ianaTz = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
-// const monthOf = (isoDate: string) => isoDate.slice(0, 7);
 
 function getIconByKey(key?: string | null): LucideIcon {
   if (!key) return DEFAULT_ICON;
@@ -345,6 +335,10 @@ export default function App() {
   return (
     <div className="container">
       <h1>Habit Tracker</h1>
+
+      <button className="logoutbtn" onClick={handleLogout}>
+        Logout
+      </button>
 
       <div className="actions">
         <button className="btn archive" onClick={openArchivedForm}>
