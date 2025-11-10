@@ -37,12 +37,18 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="auth-container">
         <h2>{mode === "login" ? "Sign In" : "Register"}</h2>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} autoComplete="on">
           <label>Email
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </label>
           <label>Password
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <input
+              type="password"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
           </label>
           {error && <p className="error">{error}</p>}
           <button type="submit">{mode === "login" ? "Sign In" : "Register"}</button>
