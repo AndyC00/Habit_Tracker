@@ -3,6 +3,10 @@
   base = "frontend"
   publish = "dist"           # IMPORTANT: publish is relative to base
   command = "npm ci && npm run build"
+  functions = "src/lib"
+
+[functions]
+  node_bundler = "esbuild"
 
 [[redirects]]
   from = "/*"

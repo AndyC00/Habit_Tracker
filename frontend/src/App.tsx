@@ -148,6 +148,10 @@ export default function App() {
   const [formPending, setFormPending] = useState(false);
 
   // --- inner functions ---
+  function handleDonate() {
+    //window.open("", "_blank");
+  }
+
   async function load() {
     try {
       setLoading(true);
@@ -338,6 +342,10 @@ export default function App() {
 
       <button className="logoutbtn" onClick={handleLogout}>
         Logout
+      </button>
+
+      <button className="donate" onClick={handleDonate}>
+        buy me a coffee please~
       </button>
 
       <div className="actions">

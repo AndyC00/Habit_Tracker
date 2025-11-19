@@ -1,24 +1,45 @@
-// payment.js - Node.js + Express backend
-const express = require('express');
-const cors = require('cors');
-//const stripe = require('stripe')('sk_test_your_secret_key_here');
 
-const app = express();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
+exports.handler = async (event, context) => {
+  // set CORS header
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
 
-// create paying attempt
-app.post('/create-payment-intent', async (req, res) => {
+  // deal with OPTIONS pre-check request
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: '',
+    };
+  }
+
+  // only allow POST request
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method not allowed' }),
+    };
+  }
+
   try {
-    const { amount } = req.body;
+    const { amount } = JSON.parse(event.body);
     
     // verify amount
-    if (!amount || amount < 50) { // minimum amount on Stripe is 0.5
-      return res.status(400).json({ error: 'The amount must be more than 0.50' });
+    if (!amount || amount < 50) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'The amount has to be more than 0.50' }),
+      };
     }
 
+    // create payment attempt
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount),
       currency: 'nzd',
@@ -28,28 +49,21 @@ app.post('/create-payment-intent', async (req, res) => {
       description: 'user donation',
     });
 
-    res.json({
-      clientSecret: paymentIntent.client_secret,
-    });
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: error.message });
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        clientSecret: paymentIntent.client_secret,
+      }),
+    };
+  } 
+  catch (error) {
+    console.error('Stripe Error:', error);
+    
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: error.message }),
+    };
   }
-});
-
-// verify the payment status
-app.get('/payment-status/:paymentIntentId', async (req, res) => {
-  try {
-    const paymentIntent = await stripe.paymentIntents.retrieve(
-      req.params.paymentIntentId
-    );
-    res.json({ status: paymentIntent.status });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+};
