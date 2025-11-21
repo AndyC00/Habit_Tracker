@@ -383,7 +383,7 @@ export default function App() {
       </button>
 
       <button className="donate" onClick={handleDonate}>
-        buy me a coffee please~
+        buy me a coffee☕
       </button>
 
       {donateOpen && (

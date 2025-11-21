@@ -115,8 +115,10 @@
   background: #f2c121;
   color: #000;
   cursor: pointer;
-  margin-left: 8px;
-  margin-bottom: 16px;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
 }
 
 .btn {
