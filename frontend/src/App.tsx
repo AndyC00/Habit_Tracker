@@ -128,6 +128,11 @@ export default function App() {
   const [archivedStatsById, setArchivedStatsById] = useState<Record<number, Stats | undefined>>({});
   const [openChart, setOpenChart] = useState<null | { type: 'week' | 'month' | 'total'; habitId: number }>(null);
 
+  const [donateOpen, setDonateOpen] = useState(false);
+  const [donateAmount, setDonateAmount] = useState<number | "">(2);
+  const [donatePending, setDonatePending] = useState(false);
+  const [donateError, setDonateError] = useState<string | null>(null);
+
   const defaultFormValues: HabitFormValues = {
     name: "",
     description: "",
@@ -149,7 +154,40 @@ export default function App() {
 
   // --- inner functions ---
   function handleDonate() {
-    //window.open("", "_blank");
+    setDonateOpen(true);
+  }
+
+  async function handleDonateConfirm() {
+    if (donateAmount === "" || donateAmount < 0.5) {
+      setDonateError("Amount must be at least 0.5 NZD.");
+      return;
+    }
+
+    setDonatePending(true);
+    setDonateError(null);
+
+    try {
+      const cents = Math.round(donateAmount * 100);
+
+      const res = await fetch("/.netlify/functions/payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: cents }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.url) {
+        setDonateError(data.error ?? "Failed to create checkout session.");
+        return;
+      }
+
+      window.location.href = data.url;
+    } catch (e: any) {
+      setDonateError(e.message ?? "Unexpected error.");
+    } finally {
+      setDonatePending(false);
+    }
   }
 
   async function load() {
@@ -347,6 +385,75 @@ export default function App() {
       <button className="donate" onClick={handleDonate}>
         buy me a coffee please~
       </button>
+
+      {donateOpen && (
+        <div
+          className="habit-form-backdrop"
+          role="presentation"
+          onClick={() => !donatePending && setDonateOpen(false)}
+        >
+          <div
+            className="habit-form"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2>Support this app</h2>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              {[2, 5, 10].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  className="btn"
+                  style={{
+                    background: donateAmount === v ? "#44b0de" : undefined,
+                    borderColor: donateAmount === v ? "#44b0de" : undefined,
+                  }}
+                  onClick={() => setDonateAmount(v)}
+                  disabled={donatePending}
+                >
+                  ${v}
+                </button>
+              ))}
+            </div>
+
+            <label>
+              Custom amount (NZD)
+              <input
+                type="number"
+                min={0.5}
+                step={0.5}
+                value={donateAmount === "" ? "" : donateAmount}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setDonateAmount(value === "" ? "" : Number(value));
+                }}
+                disabled={donatePending}
+              />
+            </label>
+
+            {donateError && (
+              <div className="habit-form-error">{donateError}</div>
+            )}
+
+            <div className="habit-form-actions">
+              <button
+                className="btn"
+                onClick={() => setDonateOpen(false)}
+                disabled={donatePending}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn primary"
+                onClick={handleDonateConfirm}
+                disabled={donatePending}
+              >
+                {donatePending ? "Processing..." : "Confirm & Pay"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="actions">
         <button className="btn archive" onClick={openArchivedForm}>

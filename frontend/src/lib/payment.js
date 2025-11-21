@@ -29,8 +29,8 @@ exports.handler = async (event, context) => {
 
   try {
     const { amount } = JSON.parse(event.body);
-    
-    // verify amount
+
+    // verify amount (Stripe expects at least 50 cents)
     if (!amount || amount < 50) {
       return {
         statusCode: 400,
@@ -39,27 +39,40 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // create payment attempt
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount),
-      currency: 'nzd',
-      automatic_payment_methods: {
-        enabled: true,
-      },
-      description: 'user donation',
+    const origin =
+      event.headers.origin ||
+      (event.headers.referer && new URL(event.headers.referer).origin) ||
+      `https://${event.headers.host}`;
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'nzd',
+            product_data: {
+              name: 'User donation',
+            },
+            unit_amount: Math.round(amount),
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: `${origin}/?payment=success`,
+      cancel_url: `${origin}/?payment=cancel`,
     });
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        clientSecret: paymentIntent.client_secret,
+        url: session.url,
       }),
     };
-  } 
-  catch (error) {
+  } catch (error) {
     console.error('Stripe Error:', error);
-    
+
     return {
       statusCode: 500,
       headers,
