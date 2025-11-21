@@ -388,7 +388,7 @@ export default function App() {
 
       {donateOpen && (
         <div
-          className="habit-form-backdrop"
+          className="donate-overlay"
           role="presentation"
           onClick={() => !donatePending && setDonateOpen(false)}
         >
@@ -397,6 +397,9 @@ export default function App() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2>Support this app</h2>
+            <p style={{ marginTop: 4, marginBottom: 8 }}>
+              Choose an amount and click confirm to go to Stripe Checkout.
+            </p>
 
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
               {[2, 5, 10].map((v) => (
