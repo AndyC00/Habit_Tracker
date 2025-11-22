@@ -287,6 +287,11 @@
   font-weight: 600;
 }
 
+.habit-form-info {
+  color: #44b0de;
+  font-weight: 600;
+}
+
 /* -------- Auth UI (login/register) -------- */
 .auth-container {
   width: min(420px, 92vw);

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Dumbbell, BookOpen, Droplet, Moon, Code, Music, Coffee, Target, Timer, Circle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 
 import * as store from "./lib/localStore";
 import { WeekChart, MonthChart, TotalChart } from "./lib/LineCharts";
@@ -50,6 +52,7 @@ const ICONS = {
 
 type IconKey = keyof typeof ICONS;
 const DEFAULT_ICON: LucideIcon = Circle;
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
 
 // ------------------ helper functions ------------------
 async function handleLogout() {
@@ -132,6 +135,8 @@ export default function App() {
   const [donateAmount, setDonateAmount] = useState<number | "">(2);
   const [donatePending, setDonatePending] = useState(false);
   const [donateError, setDonateError] = useState<string | null>(null);
+  const [donateClientSecret, setDonateClientSecret] = useState<string | null>(null);
+  const [donateStatus, setDonateStatus] = useState<string | null>(null);
 
   const defaultFormValues: HabitFormValues = {
     name: "",
@@ -154,6 +159,9 @@ export default function App() {
 
   // --- inner functions ---
   function handleDonate() {
+    setDonateError(null);
+    setDonateStatus(null);
+    setDonateClientSecret(null);
     setDonateOpen(true);
   }
 
@@ -162,9 +170,14 @@ export default function App() {
       setDonateError("Amount must be at least 0.5 NZD.");
       return;
     }
+    if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
+      setDonateError("Missing VITE_STRIPE_PUBLISHABLE_KEY in env.");
+      return;
+    }
 
     setDonatePending(true);
     setDonateError(null);
+    setDonateStatus(null);
 
     try {
       const cents = Math.round(donateAmount * 100);
@@ -182,8 +195,8 @@ export default function App() {
         return;
       }
 
-      alert(`Payment intent created.\nclientSecret: ${data.clientSecret}\n\nIntegrate Stripe.js to confirm the payment on the client.`);
-      setDonateOpen(false);
+      setDonateClientSecret(data.clientSecret);
+      setDonateStatus("Payment intent created. Please enter card details to pay.");
     } catch (e: any) {
       setDonateError(e.message ?? "Unexpected error.");
     } finally {
@@ -399,62 +412,84 @@ export default function App() {
           >
             <h2>Support this app</h2>
             <p style={{ marginTop: 4, marginBottom: 8 }}>
-              Choose an amount and click confirm to go to Stripe Checkout.
+              Choose an amount, create the payment intent, then enter card details to pay.
             </p>
 
-            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-              {[2, 5, 10].map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  className="btn"
-                  style={{
-                    background: donateAmount === v ? "#44b0de" : undefined,
-                    borderColor: donateAmount === v ? "#44b0de" : undefined,
-                  }}
-                  onClick={() => setDonateAmount(v)}
-                  disabled={donatePending}
-                >
-                  ${v}
-                </button>
-              ))}
-            </div>
+            {!donateClientSecret && (
+              <>
+                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  {[2, 5, 10].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      className="btn"
+                      style={{
+                        background: donateAmount === v ? "#44b0de" : undefined,
+                        borderColor: donateAmount === v ? "#44b0de" : undefined,
+                      }}
+                      onClick={() => setDonateAmount(v)}
+                      disabled={donatePending}
+                    >
+                      ${v}
+                    </button>
+                  ))}
+                </div>
 
-            <label>
-              Custom amount (NZD)
-              <input
-                type="number"
-                min={0.5}
-                step={0.5}
-                value={donateAmount === "" ? "" : donateAmount}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setDonateAmount(value === "" ? "" : Number(value));
-                }}
-                disabled={donatePending}
-              />
-            </label>
+                <label>
+                  Custom amount (NZD)
+                  <input
+                    type="number"
+                    min={0.5}
+                    step={0.5}
+                    value={donateAmount === "" ? "" : donateAmount}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setDonateAmount(value === "" ? "" : Number(value));
+                    }}
+                    disabled={donatePending}
+                  />
+                </label>
+              </>
+            )}
+
+            {donateStatus && (
+              <div className="habit-form-info">{donateStatus}</div>
+            )}
 
             {donateError && (
               <div className="habit-form-error">{donateError}</div>
             )}
 
-            <div className="habit-form-actions">
-              <button
-                className="btn"
-                onClick={() => setDonateOpen(false)}
-                disabled={donatePending}
+            {donateClientSecret ? (
+              <Elements
+                key={donateClientSecret}
+                stripe={stripePromise}
+                options={{ clientSecret: donateClientSecret }}
               >
-                Cancel
-              </button>
-              <button
-                className="btn primary"
-                onClick={handleDonateConfirm}
-                disabled={donatePending}
-              >
-                {donatePending ? "Processing..." : "Confirm & Pay"}
-              </button>
-            </div>
+                <DonatePaymentForm
+                  onClose={() => setDonateOpen(false)}
+                  setStatus={setDonateStatus}
+                  setError={setDonateError}
+                />
+              </Elements>
+            ) : (
+              <div className="habit-form-actions">
+                <button
+                  className="btn"
+                  onClick={() => setDonateOpen(false)}
+                  disabled={donatePending}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn primary"
+                  onClick={handleDonateConfirm}
+                  disabled={donatePending}
+                >
+                  {donatePending ? "Processing..." : "Create Payment"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -745,5 +780,71 @@ export default function App() {
         </div>
       )}
     </div>
+  );
+}
+
+function DonatePaymentForm({
+  onClose,
+  setStatus,
+  setError,
+}: {
+  onClose: () => void;
+  setStatus: (msg: string | null) => void;
+  setError: (msg: string | null) => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [submitPending, setSubmitPending] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!stripe || !elements) {
+      setError("Stripe not ready yet.");
+      return;
+    }
+
+    setSubmitPending(true);
+    setError(null);
+    setStatus(null);
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: window.location.href,
+      },
+      redirect: "if_required",
+    });
+
+    if (error) {
+      setError(error.message ?? "Payment failed.");
+    } else if (paymentIntent) {
+      if (paymentIntent.status === "succeeded") {
+        setStatus("Payment succeeded. Thank you!");
+        onClose();
+      } else {
+        setStatus(`Payment status: ${paymentIntent.status}`);
+      }
+    }
+
+    setSubmitPending(false);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <PaymentElement />
+      <div className="habit-form-actions">
+        <button
+          className="btn"
+          type="button"
+          onClick={onClose}
+          disabled={submitPending}
+        >
+          Close
+        </button>
+        <button className="btn primary" type="submit" disabled={submitPending || !stripe}>
+          {submitPending ? "Paying..." : "Pay now"}
+        </button>
+      </div>
+    </form>
   );
 }
