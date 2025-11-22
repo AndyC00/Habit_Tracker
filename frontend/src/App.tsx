@@ -156,6 +156,7 @@ export default function App() {
   const [formValues, setFormValues] = useState<HabitFormValues>(defaultFormValues);
   const [formError, setFormError] = useState<string | null>(null);
   const [formPending, setFormPending] = useState(false);
+  const [now, setNow] = useState<Date>(new Date());
 
   // --- inner functions ---
   function handleDonate() {
@@ -241,6 +242,11 @@ export default function App() {
 
   useEffect(() => {
     load();
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   async function checkIn(habitId: number) {
@@ -391,6 +397,19 @@ export default function App() {
   return (
     <div className="container">
       <h1>Habit Tracker</h1>
+      <div style={{ marginBottom: 12, opacity: 0.85 }}>
+        {new Intl.DateTimeFormat(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+          timeZoneName: "short",
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }).format(now)}
+      </div>
 
       <button className="logoutbtn" onClick={handleLogout}>
         Logout
