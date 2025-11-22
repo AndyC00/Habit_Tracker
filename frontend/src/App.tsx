@@ -7,6 +7,7 @@ import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-
 
 import * as store from "./lib/localStore";
 import { WeekChart, MonthChart, TotalChart } from "./lib/LineCharts";
+import { loadActiveHabitsWithStats, loadArchivedHabitsWithStats, getStatsForHabit } from "./lib/services/habitService";
 
 import { logout } from "./lib/auth";
 
@@ -206,28 +207,11 @@ export default function App() {
   }
 
   async function load() {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     try {
       setLoading(true);
-      const list = await store.listHabits(false);
+      const { habits: list, statsById: statsMap, durationById: durMap } = await loadActiveHabitsWithStats(tz);
       setHabits(list);
-
-      const today = todayLocalISO();
-      const mo = today.slice(0, 7);
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-      const entries = await Promise.all(
-        list.map(async (h) => {
-          const s = await store.getStats(h.id, mo, tz);
-          return [h.id, s] as const;
-        })
-      );
-
-      const statsMap: Record<number, Stats> = {};
-      const durMap: Record<number, number | "" | undefined> = {};
-      for (const [id, s] of entries) {
-        statsMap[id] = s;
-        durMap[id] = s.todayDurationMinutes ?? "";
-      }
       setStatsById(statsMap);
       setDurationById(durMap);
     }
@@ -279,12 +263,11 @@ export default function App() {
   }
 
   async function refreshStatsFor(habitId: number) {
-    const mo = todayLocalISO().slice(0, 7);
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const s = await store.getStats(habitId, mo, tz);
+    const { stats, todayDuration } = await getStatsForHabit(habitId, tz);
 
-    setStatsById((prev) => ({ ...prev, [habitId]: s }));
-    setDurationById((prev) => ({ ...prev, [habitId]: s.todayDurationMinutes ?? "" }));
+    setStatsById((prev) => ({ ...prev, [habitId]: stats }));
+    setDurationById((prev) => ({ ...prev, [habitId]: todayDuration }));
   }
 
   // --- form functions ---
@@ -298,23 +281,10 @@ export default function App() {
     (async () => {
       try {
         setFormError(null);
-        // Load archived habits and their stats
-        const list = await store.listHabits(true);
-        const archived = list.filter((h) => h.isArchived);
-        setArchivedHabits(archived);
-
-        const today = todayLocalISO();
-        const mo = today.slice(0, 7);
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const entries = await Promise.all(
-          archived.map(async (h) => {
-            const s = await store.getStats(h.id, mo, tz);
-            return [h.id, s] as const;
-          })
-        );
-        const statsMap: Record<number, Stats> = {};
-        for (const [id, s] of entries) statsMap[id] = s;
-        setArchivedStatsById(statsMap);
+        const { habits: archived, statsById } = await loadArchivedHabitsWithStats(tz);
+        setArchivedHabits(archived);
+        setArchivedStatsById(statsById);
 
         setFormMode({ type: "archived" });
       } catch (e: any) {
