@@ -532,6 +532,12 @@ export default function App() {
                         [h.id]: e.target.value === "" ? "" : Number(e.target.value),
                       }))
                     }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && pendingId !== h.id) {
+                        e.preventDefault();
+                        checkIn(h.id);
+                      }
+                    }}
                     style={{ width: 120, marginRight: 8 }}
                     placeholder="optional"
                   />
