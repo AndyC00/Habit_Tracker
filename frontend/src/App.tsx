@@ -177,12 +177,13 @@ export default function App() {
 
       const data = await res.json();
 
-      if (!res.ok || !data.url) {
-        setDonateError(data.error ?? "Failed to create checkout session.");
+      if (!res.ok || !data.clientSecret) {
+        setDonateError(data.error ?? "Failed to create payment intent.");
         return;
       }
 
-      window.location.href = data.url;
+      alert(`Payment intent created.\nclientSecret: ${data.clientSecret}\n\nIntegrate Stripe.js to confirm the payment on the client.`);
+      setDonateOpen(false);
     } catch (e: any) {
       setDonateError(e.message ?? "Unexpected error.");
     } finally {
