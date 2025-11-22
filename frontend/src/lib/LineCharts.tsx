@@ -28,7 +28,7 @@ export function WeekChart({ habitId }: { habitId: number }) {
   }, [habitId]);
 
   if (err) return <div className="error">{err}</div>;
-  if (!points) return <div className="loading">Loading…</div>;
+  if (!points) return <div className="loading">Loading...</div>;
 
   // Y-axis 0..max cumulative value
   const values = points.map((p) => p.minutes);
@@ -136,7 +136,7 @@ export function MonthChart({ habitId }: { habitId: number }) {
   }, [habitId]);
 
   if (err) return <div className="error">{err}</div>;
-  if (!points) return <div className="loading">Loading…</div>;
+  if (!points) return <div className="loading">Loading...</div>;
 
   const values = points.map((p) => p.minutes);
   const vmax = Math.max(...values);
@@ -223,13 +223,39 @@ export function MonthChart({ habitId }: { habitId: number }) {
 // ------------------ Total Chart (SVG) ------------------
 export function TotalChart({ habitId }: { habitId: number }) {
   const [points, setPoints] = useState<Point[] | null>(null);
+  const [years, setYears] = useState<number[]>([]);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
         setErr(null);
-        const series = await store.getTotalSeries(habitId);
+        const availableYears = await store.getTotalYears(habitId);
+        setYears(availableYears);
+        if (!availableYears.length) {
+          setSelectedYear(null);
+          setPoints([]);
+          return;
+        }
+        const initialYear = availableYears[0];
+        setSelectedYear(initialYear);
+      } catch (e: any) {
+        setErr(e.message ?? "Failed to load total series");
+        setYears([]);
+        setSelectedYear(null);
+        setPoints([]);
+      }
+    })();
+  }, [habitId]);
+
+  useEffect(() => {
+    if (selectedYear === null) return;
+    (async () => {
+      try {
+        setErr(null);
+        setPoints(null);
+        const series = await store.getTotalSeries(habitId, selectedYear);
         if (!series.length) {
           setPoints([]);
           return;
@@ -242,12 +268,13 @@ export function TotalChart({ habitId }: { habitId: number }) {
         setPoints(cumulative);
       } catch (e: any) {
         setErr(e.message ?? "Failed to load total series");
+        setPoints([]);
       }
     })();
-  }, [habitId]);
+  }, [habitId, selectedYear]);
 
   if (err) return <div className="error">{err}</div>;
-  if (points === null) return <div className="loading">Loading…</div>;
+  if (points === null) return <div className="loading">Loading...</div>;
   if (points.length === 0) return <div className="error">No data</div>;
 
   const values = points.map((p) => p.minutes);
@@ -286,50 +313,73 @@ export function TotalChart({ habitId }: { habitId: number }) {
   };
 
   return (
-    <div className="chart">
-      <svg width={width} height={height} role="img" aria-label="total line chart">
-        <g transform={`translate(${margin.left},${margin.top})`}>
-          {gridYs.map((gi) => {
-            const v = yAtTick(gi);
-            const y = yScale(v);
-            return (
-              <g key={gi}>
-                <line x1={0} y1={y} x2={iw} y2={y} stroke="#333" strokeDasharray="4,4" />
-                <text
-                  x={-8}
-                  y={y}
-                  dominantBaseline="middle"
-                  textAnchor="end"
-                  fontSize={12}
-                  fill="#bbb"
-                >
-                  {Math.round(v)}
-                </text>
-              </g>
-            );
-          })}
+    <div className="chart-with-sidebar">
+      <div className="chart">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <div>Total Statistic ({selectedYear ?? "--"})</div>
+        </div>
+        <svg width={width} height={height} role="img" aria-label="total line chart">
+          <g transform={`translate(${margin.left},${margin.top})`}>
+            {gridYs.map((gi) => {
+              const v = yAtTick(gi);
+              const y = yScale(v);
+              return (
+                <g key={gi}>
+                  <line x1={0} y1={y} x2={iw} y2={y} stroke="#333" strokeDasharray="4,4" />
+                  <text
+                    x={-8}
+                    y={y}
+                    dominantBaseline="middle"
+                    textAnchor="end"
+                    fontSize={12}
+                    fill="#bbb"
+                  >
+                    {Math.round(v)}
+                  </text>
+                </g>
+              );
+            })}
 
-          {points.map((p, i) => (
-            <text
-              key={p.date}
-              x={xScale(i)}
-              y={ih + 16}
-              textAnchor="middle"
-              fontSize={11}
-              fill="#bbb"
-              opacity={i % labelStride === 0 ? 1 : 0}
+            {points.map((p, i) => (
+              <text
+                key={p.date}
+                x={xScale(i)}
+                y={ih + 16}
+                textAnchor="middle"
+                fontSize={11}
+                fill="#bbb"
+                opacity={i % labelStride === 0 ? 1 : 0}
+              >
+                {i % labelStride === 0 ? fmt(p.date) : ""}
+              </text>
+            ))}
+
+            <path d={pathD} fill="none" stroke="#ffffff" strokeWidth={2} />
+
+            {points.map((p, i) => (
+              <circle key={p.date} cx={xScale(i)} cy={yScale(p.minutes)} r={3} fill="#ffffff" />
+            ))}
+          </g>
+        </svg>
+      </div>
+      <div className="chart-sidebar">
+        <div className="chart-sidebar-title">Years</div>
+        <div className="chart-year-buttons">
+          {years.map((y) => (
+            <button
+              key={y}
+              className={`btn year-btn${selectedYear === y ? " active" : ""}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedYear(y);
+              }}
             >
-              {i % labelStride === 0 ? fmt(p.date) : ""}
-            </text>
+              {y}
+            </button>
           ))}
-
-          <path d={pathD} fill="none" stroke="#ffffff" strokeWidth={2} />
-
-          {points.map((p, i) => (
-            <circle key={p.date} cx={xScale(i)} cy={yScale(p.minutes)} r={3} fill="#ffffff" />
-          ))}
-        </g>
-      </svg>
+          {!years.length && <div className="chart-year-empty">No data</div>}
+        </div>
+      </div>
     </div>
   );
 }

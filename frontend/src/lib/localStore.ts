@@ -385,6 +385,28 @@ export async function getStats(
 }
 
 // ---------- Series (for charts) ----------
+async function getAllChecksSorted(
+  habitId: number,
+): Promise<{ date: string; minutes: number }[]> {
+  if (USE_LOCAL_STORAGE) {
+    const db = loadDB();
+    return db.checkins
+      .filter((c) => c.habitId === habitId)
+      .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
+      .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
+  }
+
+  await authReady;
+  const { db } = getFirebase();
+  const uid = getUid();
+  const qy = query(collection(db, "users", uid, "checkins"), where("habitId", "==", habitId));
+  const snap = await getDocs(qy);
+  return snap.docs
+    .map((d) => d.data() as CheckIn)
+    .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
+    .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
+}
+
 export async function getRecentSeries(
   habitId: number,
   days: number,
@@ -476,30 +498,14 @@ export async function getMonthSeries(
 
 export async function getTotalSeries(
   habitId: number,
+  year?: number,
   tz?: string,
 ): Promise<{ date: string; minutes: number }[]> {
-  let checks: { date: string; minutes: number }[];
-  if (USE_LOCAL_STORAGE) {
-    const db = loadDB();
-    checks = db.checkins
-      .filter((c) => c.habitId === habitId)
-      .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
-      .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
-  } 
-  else {
-    await authReady;
-    const { db } = getFirebase();
-    const uid = getUid();
-    const qy = query(collection(db, "users", uid, "checkins"), where("habitId", "==", habitId));
-    const snap = await getDocs(qy);
-    checks = snap.docs
-      .map((d) => d.data() as CheckIn)
-      .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
-      .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
-  }
+  const checks = await getAllChecksSorted(habitId);
+  if (checks.length === 0) return [];
 
   const today = todayInTZISO(tz);
-  const targetYear = today.slice(0, 4); // only show current year's data
+  const targetYear = String(year ?? Number(today.slice(0, 4)));
   const filtered = checks.filter((c) => c.date.slice(0, 4) === targetYear);
   if (filtered.length === 0) return [];
 
@@ -519,7 +525,16 @@ export async function getTotalSeries(
     result.push({ date: `${targetYear}-${month}-01`, minutes: acc });
   }
 
-  return result; // Jan -> Dec cumulative for current year
+  return result; // Jan -> Dec cumulative for selected year
+}
+
+export async function getTotalYears(habitId: number): Promise<number[]> {
+  const checks = await getAllChecksSorted(habitId);
+  const years = new Set<number>();
+  for (const c of checks) {
+    years.add(Number(c.date.slice(0, 4)));
+  }
+  return Array.from(years).sort((a, b) => b - a);
 }
 
 // ---------- export/import for backup (local only) ----------

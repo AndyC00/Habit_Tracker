@@ -180,6 +180,49 @@
   padding: 8px;
 }
 
+.chart-with-sidebar {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.chart-sidebar {
+  min-width: 140px;
+  background: #0f0f0f;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chart-sidebar-title {
+  font-weight: 700;
+}
+
+.chart-year-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.year-btn {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.year-btn.active {
+  background: #44b0de;
+  border-color: #44b0de;
+}
+
+.chart-year-empty {
+  opacity: 0.7;
+}
+
 /* overlay that sits centered within a habit card */
 .habit-chart-overlay {
   position: absolute;
