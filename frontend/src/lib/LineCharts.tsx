@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import * as store from "./localStore";
 
 type Point = { date: string; minutes: number };
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 // ------------------ Week Chart (SVG) ------------------
 export function WeekChart({ habitId }: { habitId: number }) {
@@ -278,8 +279,11 @@ export function TotalChart({ habitId }: { habitId: number }) {
     return yMin + (yMax - yMin) * (1 - t);
   };
 
-  const labelStride = Math.max(1, Math.ceil(points.length / 10));
-  const fmt = (iso: string) => iso.slice(5); // MM-DD
+  const labelStride = 1; // show each month (Jan-Dec)
+  const fmt = (iso: string) => {
+    const idx = Number(iso.slice(5, 7)) - 1;
+    return MONTH_LABELS[idx] ?? "";
+  };
 
   return (
     <div className="chart">

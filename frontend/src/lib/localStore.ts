@@ -478,7 +478,6 @@ export async function getTotalSeries(
   habitId: number,
   tz?: string,
 ): Promise<{ date: string; minutes: number }[]> {
-  void tz; // maintain signature
   let checks: { date: string; minutes: number }[];
   if (USE_LOCAL_STORAGE) {
     const db = loadDB();
@@ -499,23 +498,28 @@ export async function getTotalSeries(
       .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
   }
 
-  if (checks.length === 0) return [];
+  const today = todayInTZISO(tz);
+  const targetYear = today.slice(0, 4); // only show current year's data
+  const filtered = checks.filter((c) => c.date.slice(0, 4) === targetYear);
+  if (filtered.length === 0) return [];
 
-  const start = checks[0].date;
-  const end = checks[checks.length - 1].date;
-  const days = isoToEpochDays(end) - isoToEpochDays(start) + 1;
-
-  const map = new Map<string, number>();
-  for (const p of checks) map.set(p.date, p.minutes ?? 0);
-
-  const result: { date: string; minutes: number }[] = [];
-  for (let i = 0; i < days; i++) {
-    const d = addDaysISO(start, i);
-    const v = map.get(d);
-    result.push({ date: d, minutes: v ?? 0 });
+  const monthlyTotals = Array(12).fill(0);
+  for (const rec of filtered) {
+    const monthIndex = Number(rec.date.slice(5, 7)) - 1;
+    if (monthIndex >= 0 && monthIndex < 12) {
+      monthlyTotals[monthIndex] += rec.minutes ?? 0;
+    }
   }
 
-  return result; // oldest -> newest over full range
+  const result: { date: string; minutes: number }[] = [];
+  let acc = 0;
+  for (let i = 0; i < 12; i++) {
+    acc += monthlyTotals[i];
+    const month = String(i + 1).padStart(2, "0");
+    result.push({ date: `${targetYear}-${month}-01`, minutes: acc });
+  }
+
+  return result; // Jan -> Dec cumulative for current year
 }
 
 // ---------- export/import for backup (local only) ----------
