@@ -12,6 +12,7 @@ export type Habit = {
   iconKey?: string | null;
   isArchived: boolean;
   createdUtc?: string;
+  isExample?: boolean;
 };
 
 export type CheckIn = {

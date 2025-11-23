@@ -1,31 +1,45 @@
 import { useEffect, useState } from "react";
+import {
+  EXAMPLE_HABIT_ID,
+  EXAMPLE_MONTH_SERIES,
+  EXAMPLE_TOTAL_SERIES_BY_YEAR,
+  EXAMPLE_TOTAL_YEARS,
+  EXAMPLE_WEEK_SERIES,
+} from "./exampleHabits";
 import * as store from "./localStore";
 
 type Point = { date: string; minutes: number };
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+function toCumulative(series: Point[]): Point[] {
+  let acc = 0;
+  return series.map((p) => {
+    acc += p.minutes;
+    return { date: p.date, minutes: acc };
+  });
+}
+
 // ------------------ Week Chart (SVG) ------------------
 export function WeekChart({ habitId }: { habitId: number }) {
   const [points, setPoints] = useState<Point[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const isExample = habitId === EXAMPLE_HABIT_ID;
 
   useEffect(() => {
     (async () => {
       try {
         setErr(null);
+        if (isExample) {
+          setPoints(toCumulative(EXAMPLE_WEEK_SERIES));
+          return;
+        }
         const series = await store.getRecentSeries(habitId, 7);
-        // cumulative values (non-decreasing)
-        let acc = 0;
-        const cumulative = series.map((p) => {
-          acc += p.minutes;
-          return { date: p.date, minutes: acc };
-        });
-        setPoints(cumulative);
+        setPoints(toCumulative(series));
       } catch (e: any) {
         setErr(e.message ?? "Failed to load week series");
       }
     })();
-  }, [habitId]);
+  }, [habitId, isExample]);
 
   if (err) return <div className="error">{err}</div>;
   if (!points) return <div className="loading">Loading...</div>;
@@ -117,23 +131,23 @@ export function WeekChart({ habitId }: { habitId: number }) {
 export function MonthChart({ habitId }: { habitId: number }) {
   const [points, setPoints] = useState<Point[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const isExample = habitId === EXAMPLE_HABIT_ID;
 
   useEffect(() => {
     (async () => {
       try {
         setErr(null);
+        if (isExample) {
+          setPoints(toCumulative(EXAMPLE_MONTH_SERIES));
+          return;
+        }
         const series = await store.getMonthSeries(habitId);
-        let acc = 0;
-        const cumulative = series.map((p) => {
-          acc += p.minutes;
-          return { date: p.date, minutes: acc };
-        });
-        setPoints(cumulative);
+        setPoints(toCumulative(series));
       } catch (e: any) {
         setErr(e.message ?? "Failed to load month series");
       }
     })();
-  }, [habitId]);
+  }, [habitId, isExample]);
 
   if (err) return <div className="error">{err}</div>;
   if (!points) return <div className="loading">Loading...</div>;
@@ -226,11 +240,19 @@ export function TotalChart({ habitId }: { habitId: number }) {
   const [years, setYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const isExample = habitId === EXAMPLE_HABIT_ID;
 
   useEffect(() => {
     (async () => {
       try {
         setErr(null);
+        if (isExample) {
+          setYears(EXAMPLE_TOTAL_YEARS);
+          const initialYear = EXAMPLE_TOTAL_YEARS[0] ?? null;
+          setSelectedYear(initialYear);
+          setPoints(initialYear ? toCumulative(EXAMPLE_TOTAL_SERIES_BY_YEAR[initialYear] ?? []) : []);
+          return;
+        }
         const availableYears = await store.getTotalYears(habitId);
         setYears(availableYears);
         if (!availableYears.length) {
@@ -247,7 +269,7 @@ export function TotalChart({ habitId }: { habitId: number }) {
         setPoints([]);
       }
     })();
-  }, [habitId]);
+  }, [habitId, isExample]);
 
   useEffect(() => {
     if (selectedYear === null) return;
@@ -255,23 +277,23 @@ export function TotalChart({ habitId }: { habitId: number }) {
       try {
         setErr(null);
         setPoints(null);
+        if (isExample) {
+          const series = EXAMPLE_TOTAL_SERIES_BY_YEAR[selectedYear] ?? [];
+          setPoints(toCumulative(series));
+          return;
+        }
         const series = await store.getTotalSeries(habitId, selectedYear);
         if (!series.length) {
           setPoints([]);
           return;
         }
-        let acc = 0;
-        const cumulative = series.map((p) => {
-          acc += p.minutes;
-          return { date: p.date, minutes: acc };
-        });
-        setPoints(cumulative);
+        setPoints(toCumulative(series));
       } catch (e: any) {
         setErr(e.message ?? "Failed to load total series");
         setPoints([]);
       }
     })();
-  }, [habitId, selectedYear]);
+  }, [habitId, isExample, selectedYear]);
 
   if (err) return <div className="error">{err}</div>;
   if (points === null) return <div className="loading">Loading...</div>;

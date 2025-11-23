@@ -1,11 +1,18 @@
 import type { Habit, Stats } from "../localStore";
 import * as store from "../localStore";
+import {
+  EXAMPLE_DURATION_BY_ID,
+  EXAMPLE_HABIT_ID,
+  EXAMPLE_STATS_BY_ID,
+  getExampleHabitsData,
+} from "../exampleHabits";
 
 type WithStatsMaps = {
   habits: Habit[];
   statsById: Record<number, Stats>;
   durationById: Record<number, number | "" | undefined>;
 };
+type WithStatsMapsResult = WithStatsMaps & { isExample: boolean };
 
 function todayInTZISO(tz?: string): string {
   const timeZone = tz || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -44,9 +51,13 @@ async function buildStatsMap(habits: Habit[], tz?: string): Promise<WithStatsMap
   return { habits, statsById, durationById };
 }
 
-export async function loadActiveHabitsWithStats(tz?: string): Promise<WithStatsMaps> {
+export async function loadActiveHabitsWithStats(tz?: string): Promise<WithStatsMapsResult> {
   const habits = await store.listHabits(false);
-  return buildStatsMap(habits, tz);
+  if (!habits.length) {
+    return getExampleHabitsData();
+  }
+  const data = await buildStatsMap(habits, tz);
+  return { ...data, isExample: false };
 }
 
 export async function loadArchivedHabitsWithStats(tz?: string): Promise<WithStatsMaps> {
@@ -59,6 +70,12 @@ export async function getStatsForHabit(habitId: number, tz?: string): Promise<{
   stats: Stats;
   todayDuration: number | "" | undefined;
 }> {
+  if (habitId === EXAMPLE_HABIT_ID) {
+    return {
+      stats: EXAMPLE_STATS_BY_ID[habitId],
+      todayDuration: EXAMPLE_DURATION_BY_ID[habitId],
+    };
+  }
   const monthKey = monthKeyFromToday(tz);
   const stats = await store.getStats(habitId, monthKey, tz);
   return {

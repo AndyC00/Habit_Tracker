@@ -6,37 +6,19 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 
 import * as store from "./lib/localStore";
+import type { Habit, Stats } from "./lib/localStore";
 import { WeekChart, MonthChart, TotalChart } from "./lib/LineCharts";
 import { loadActiveHabitsWithStats, loadArchivedHabitsWithStats, getStatsForHabit } from "./lib/services/habitService";
 
 import { logout } from "./lib/auth";
 
 // ------------------ constants and types ------------------
-type Habit = {
-  id: number;
-  name: string;
-  description?: string | null;
-  colorHex?: string | null;
-  iconKey?: string | null;
-  isArchived: boolean;
-};
-
 type HabitFormValues = {
   name: string;
   description: string;
   colorHex: string;
   iconKey: string;
   isArchived: boolean;
-};
-
-type Stats = {
-  completedThisMonth: number;
-  completedTotal: number;
-  longestStreak: number;
-  totalDurationMinutes: number;
-  durationThisMonth: number;
-  hasTodayCheckIn: boolean;
-  todayDurationMinutes: number | null;
 };
 
 const ICONS = {
@@ -124,6 +106,7 @@ export default function App() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isExampleData, setIsExampleData] = useState(false);
 
   const [statsById, setStatsById] = useState<Record<number, Stats | undefined>>({});
   const [durationById, setDurationById] = useState<Record<number, number | "" | undefined>>({});
@@ -210,10 +193,11 @@ export default function App() {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     try {
       setLoading(true);
-      const { habits: list, statsById: statsMap, durationById: durMap } = await loadActiveHabitsWithStats(tz);
+      const { habits: list, statsById: statsMap, durationById: durMap, isExample } = await loadActiveHabitsWithStats(tz);
       setHabits(list);
       setStatsById(statsMap);
       setDurationById(durMap);
+      setIsExampleData(isExample);
     }
     catch (e: any) {
       setError(e.message ?? "Failed to load");
@@ -234,6 +218,7 @@ export default function App() {
   }, []);
 
   async function checkIn(habitId: number) {
+    if (isExampleData) return;
     setPendingId(habitId);
     try {
       const value = durationById[habitId];
@@ -251,6 +236,7 @@ export default function App() {
   }
 
   async function undoToday(habitId: number) {
+    if (isExampleData) return;
     setPendingId(habitId);
     try {
       await store.deleteCheckIn(habitId, todayLocalISO());
@@ -294,6 +280,7 @@ export default function App() {
   }
 
   function openEditForm(habit: Habit) {
+    if (habit.isExample) return;
     setFormValues({
       name: habit.name,
       description: habit.description ?? "",
@@ -492,11 +479,18 @@ export default function App() {
         </button>
       </div>
 
+      {isExampleData && (
+        <div className="habit-form-info" style={{ marginBottom: 12 }}>
+          Showing an example habit. Create your first habit to start tracking your own data.
+        </div>
+      )}
+
       <ul className="habits">
         {habits.map((h) => {
           const stats = statsById[h.id];
           const dur = durationById[h.id] ?? "";
           const bg = h.colorHex ?? "#1e1e1e";
+          const isExampleHabit = !!h.isExample;
 
           return (
             <li key={h.id} className="habit-item" style={{ ["--bg" as any]: bg }}>
@@ -507,6 +501,7 @@ export default function App() {
                     return <Icon className="habit-icon" size={18} />;
                   })()}
                   {h.name}
+                  {isExampleHabit && <span className="habit-archived">Example</span>}
                   {h.isArchived && <span className="habit-archived">Archived</span>}
                 </div>
                 {h.description && <div className="habit-desc">{h.description}</div>}
@@ -526,13 +521,15 @@ export default function App() {
                     type="number"
                     min={0}
                     value={dur}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      if (isExampleHabit) return;
                       setDurationById((prev) => ({
                         ...prev,
                         [h.id]: e.target.value === "" ? "" : Number(e.target.value),
-                      }))
-                    }
+                      }));
+                    }}
                     onKeyDown={(e) => {
+                      if (isExampleHabit) return;
                       if (e.key === "Enter" && pendingId !== h.id) {
                         e.preventDefault();
                         checkIn(h.id);
@@ -540,12 +537,16 @@ export default function App() {
                     }}
                     style={{ width: 120, marginRight: 8 }}
                     placeholder="optional"
+                    disabled={isExampleHabit}
                   />
                   <button
                     className="btn operation"
-                    disabled={pendingId === h.id}
-                    onClick={() => checkIn(h.id)}
-                    title={stats?.hasTodayCheckIn ? "Update today's minutes" : "Check-in today"}
+                    disabled={isExampleHabit || pendingId === h.id}
+                    onClick={() => {
+                      if (isExampleHabit) return;
+                      checkIn(h.id);
+                    }}
+                    title={isExampleHabit ? "Example habit is read-only" : stats?.hasTodayCheckIn ? "Update today's minutes" : "Check-in today"}
                   >
                     {pendingId === h.id
                       ? "Saving…"
@@ -556,15 +557,22 @@ export default function App() {
 
                   <button
                     className="btn operation"
-                    disabled={pendingId === h.id || !stats?.hasTodayCheckIn}
-                    onClick={() => undoToday(h.id)}
+                    disabled={isExampleHabit || pendingId === h.id || !stats?.hasTodayCheckIn}
+                    onClick={() => {
+                      if (isExampleHabit) return;
+                      undoToday(h.id);
+                    }}
                     style={{ marginLeft: 8 }}
                   >
                     Undo Today
                   </button>
                   <button
                     className="btn operation"
-                    onClick={() => openEditForm(h)}
+                    disabled={isExampleHabit}
+                    onClick={() => {
+                      if (isExampleHabit) return;
+                      openEditForm(h);
+                    }}
                     style={{ marginLeft: 8 }}
                   >
                     Edit
