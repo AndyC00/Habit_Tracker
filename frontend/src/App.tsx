@@ -145,6 +145,7 @@ export default function App() {
   const [chatDraft, setChatDraft] = useState("");
   const [chatPending, setChatPending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const functionsBase = (import.meta.env.VITE_FUNCTIONS_URL || "").replace(/\/$/, "");
 
   const defaultFormValues: HabitFormValues = {
     name: "",
@@ -228,7 +229,7 @@ export default function App() {
     setChatOpen(true);
 
     try {
-      const res = await fetch("/.netlify/functions/chat", {
+      const res = await fetch(`${functionsBase}/.netlify/functions/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: history, habitContext }),
@@ -859,7 +860,7 @@ export default function App() {
           {chatOpen && (
           <div className="chat-panel">
             <div className="chat-header">
-              <span>Quick Chat</span>
+              <span>AI habit advisor</span>
               <button
                 type="button"
                 className="chat-close"

@@ -79,8 +79,20 @@ exports.handler = async (event) => {
     const data = await aiRes.json();
 
     if (!aiRes.ok) {
-      const errorMessage = data?.errors?.[0]?.message || data?.error || "Cloudflare AI request failed";
-      throw new Error(errorMessage);
+      const errorMessage =
+        data?.errors?.[0]?.message ||
+        data?.error ||
+        data?.message ||
+        "Cloudflare AI request failed";
+
+      return {
+        statusCode: aiRes.status || 502,
+        headers,
+        body: JSON.stringify({
+          error: errorMessage,
+          detail: data,
+        }),
+      };
     }
 
     const reply = data?.result?.response || data?.result?.output_text || data?.result?.message?.content;
@@ -95,7 +107,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ reply }),
     };
   } catch (error) {
-    console.error("Chat function error:", error);
+      console.error("Chat function error:", error);
     return {
       statusCode: 500,
       headers,
