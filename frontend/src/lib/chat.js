@@ -76,11 +76,12 @@ exports.handler = async (event) => {
         headers: headersPayload,
         body: JSON.stringify({
           model: normalizedModel,
-          messages: [
-            {
-              role: "system",
-              content: "You are a concise, friendly assistant for a habit tracker app.",
-            },
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a concise, friendly assistant for a habit tracker app. Respond in plain text (no markdown or symbols like **). Keep evaluation short (<=3 sentences) and clear. Provide at most 3 numbered suggestions, each under 20 words.",
+          },
           habitContext
             ? {
                 role: "system",
