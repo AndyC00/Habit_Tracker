@@ -121,6 +121,9 @@ export default function App() {
   const [donateError, setDonateError] = useState<string | null>(null);
   const [donateClientSecret, setDonateClientSecret] = useState<string | null>(null);
   const [donateStatus, setDonateStatus] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<string[]>([]);
+  const [chatDraft, setChatDraft] = useState("");
 
   const defaultFormValues: HabitFormValues = {
     name: "",
@@ -782,6 +785,66 @@ export default function App() {
           )}
         </div>
       )}
+
+      <div className="chat-widget">
+        <button
+          className="chat-toggle"
+          type="button"
+          onClick={() => setChatOpen((prev) => !prev)}
+        >
+          {chatOpen ? "Close Chat" : "Chat"}
+        </button>
+
+        {chatOpen && (
+          <div className="chat-panel">
+            <div className="chat-header">
+              <span>Quick Chat</span>
+              <button
+                type="button"
+                className="chat-close"
+                onClick={() => setChatOpen(false)}
+              >
+                X
+              </button>
+            </div>
+
+            <div className="chat-body">
+              {chatMessages.length === 0 ? (
+                <p className="chat-empty">Say hi to start the conversation.</p>
+              ) : (
+                <ul>
+                  {chatMessages.map((msg, idx) => (
+                    <li key={idx} className="chat-bubble">
+                      {msg}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <form
+              className="chat-input-row"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const text = chatDraft.trim();
+                if (!text) return;
+                setChatMessages((prev) => [...prev, text]);
+                setChatDraft("");
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Type a message..."
+                value={chatDraft}
+                onChange={(e) => setChatDraft(e.target.value)}
+              />
+              <button type="submit" className="btn primary">
+                Send
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
