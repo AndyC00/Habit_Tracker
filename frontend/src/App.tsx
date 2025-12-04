@@ -21,6 +21,11 @@ type HabitFormValues = {
   isArchived: boolean;
 };
 
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 const ICONS = {
   gym: Dumbbell,
   read: BookOpen,
@@ -122,8 +127,10 @@ export default function App() {
   const [donateClientSecret, setDonateClientSecret] = useState<string | null>(null);
   const [donateStatus, setDonateStatus] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<string[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatDraft, setChatDraft] = useState("");
+  const [chatPending, setChatPending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   const defaultFormValues: HabitFormValues = {
     name: "",
@@ -189,6 +196,46 @@ export default function App() {
       setDonateError(e.message ?? "Unexpected error.");
     } finally {
       setDonatePending(false);
+    }
+  }
+
+  async function submitChat(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (chatPending) return;
+    const text = chatDraft.trim();
+    if (!text) return;
+
+    const userMessage: ChatMessage = { role: "user", content: text };
+    const history = [...chatMessages, userMessage];
+
+    setChatDraft("");
+    setChatError(null);
+    setChatMessages(history);
+    setChatPending(true);
+
+    try {
+      const res = await fetch("/.netlify/functions/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Chat request failed.");
+      }
+
+      const reply = data?.reply;
+      if (!reply) {
+        throw new Error("No reply from assistant.");
+      }
+
+      setChatMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+    } catch (e: any) {
+      setChatError(e.message ?? "Chat failed.");
+    } finally {
+      setChatPending(false);
     }
   }
 
@@ -814,32 +861,26 @@ export default function App() {
               ) : (
                 <ul>
                   {chatMessages.map((msg, idx) => (
-                    <li key={idx} className="chat-bubble">
-                      {msg}
+                    <li key={idx} className={`chat-bubble ${msg.role}`}>
+                      <span className="chat-role">{msg.role === "user" ? "You" : "AI"}</span>
+                      <div>{msg.content}</div>
                     </li>
                   ))}
                 </ul>
               )}
+              {chatError && <p className="chat-error">{chatError}</p>}
             </div>
 
-            <form
-              className="chat-input-row"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const text = chatDraft.trim();
-                if (!text) return;
-                setChatMessages((prev) => [...prev, text]);
-                setChatDraft("");
-              }}
-            >
+            <form className="chat-input-row" onSubmit={submitChat}>
               <input
                 type="text"
-                placeholder="Type a message..."
+                placeholder="Ask about your habits..."
                 value={chatDraft}
                 onChange={(e) => setChatDraft(e.target.value)}
+                disabled={chatPending}
               />
-              <button type="submit" className="btn primary">
-                Send
+              <button type="submit" className="btn primary" disabled={chatPending}>
+                {chatPending ? "Sending..." : "Send"}
               </button>
             </form>
           </div>
