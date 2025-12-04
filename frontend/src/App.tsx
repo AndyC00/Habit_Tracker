@@ -11,6 +11,7 @@ import { WeekChart, MonthChart, TotalChart } from "./lib/LineCharts";
 import { loadActiveHabitsWithStats, loadArchivedHabitsWithStats, getStatsForHabit } from "./lib/services/habitService";
 
 import { logout } from "./lib/auth";
+import ChatWidget, { type ChatMessage } from "./components/ChatWidget";
 
 // ------------------ constants and types ------------------
 type HabitFormValues = {
@@ -19,11 +20,6 @@ type HabitFormValues = {
   colorHex: string;
   iconKey: string;
   isArchived: boolean;
-};
-
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
 };
 
 const ICONS = {
@@ -63,20 +59,6 @@ function todayLocalISO(): string {
 function getIconByKey(key?: string | null): LucideIcon {
   if (!key) return DEFAULT_ICON;
   return (ICONS as Record<string, LucideIcon>)[key] ?? DEFAULT_ICON;
-}
-
-function buildHabitContext(habit: Habit, stats?: Stats, todayMinutes?: number | "" | undefined) {
-  const lines = [
-    `Name: ${habit.name}`,
-    habit.description ? `Description: ${habit.description}` : null,
-    habit.isArchived ? "Archived: yes" : "Archived: no",
-    stats ? `Completed total: ${stats.completedTotal}` : null,
-    stats ? `Longest streak: ${stats.longestStreak}` : null,
-    stats ? `Total minutes: ${stats.totalDurationMinutes}` : null,
-    stats ? `Minutes this month: ${stats.durationThisMonth}` : null,
-    typeof todayMinutes === "number" ? `Today minutes: ${todayMinutes}` : null,
-  ].filter(Boolean);
-  return lines.join("\n");
 }
 
 const ICON_OPTIONS: { key: IconKey; label: string }[] = [
@@ -849,91 +831,19 @@ export default function App() {
         </div>
       )}
 
-      <div className="chat-widget">
-        <button
-          className="chat-toggle"
-          type="button"
-          onClick={() => setChatOpen((prev) => !prev)}
-        >
-          {chatOpen ? "Close Chat" : "Chat"}
-        </button>
-
-          {chatOpen && (
-          <div className="chat-panel">
-            <div className="chat-header">
-              <span>AI habit advisor</span>
-              <button
-                type="button"
-                className="chat-close"
-                onClick={() => setChatOpen(false)}
-                >
-                  X
-                </button>
-              </div>
-
-              {(() => {
-                const quick = habits.filter((h) => !h.isArchived && !h.isExample).slice(0, 4);
-                if (quick.length === 0) return null;
-                return (
-                  <div className="chat-quick-row">
-                    {quick.map((h) => (
-                      <button
-                        key={h.id}
-                        type="button"
-                        className="btn chat-quick"
-                        disabled={chatPending}
-                        onClick={() => {
-                          const stats = statsById[h.id];
-                          const today = durationById[h.id];
-                          const context = buildHabitContext(h, stats, today);
-                          const prompt = `Please review my habit "${h.name}" and provide evaluation and improvement suggestions based on the data.`;
-                          sendChatMessage(prompt, context);
-                        }}
-                      >
-                        {h.name}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })()}
-
-              <div className="chat-body">
-                {chatMessages.length === 0 ? (
-                  <p className="chat-empty">Say hi to start the conversation.</p>
-                ) : (
-                  <ul>
-                  {chatMessages.map((msg, idx) => (
-                    <li key={idx} className={`chat-bubble ${msg.role}`}>
-                      <span className="chat-role">{msg.role === "user" ? "You" : "AI"}</span>
-                      <div>{msg.content}</div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-                {chatError && <p className="chat-error">{chatError}</p>}
-              </div>
-
-              <form
-                className="chat-input-row"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  sendChatMessage(chatDraft);
-                }}
-              >
-                <input
-                  type="text"
-                  placeholder="Ask about your habits..."
-                  value={chatDraft}
-                  onChange={(e) => setChatDraft(e.target.value)}
-                disabled={chatPending}
-              />
-              <button type="submit" className="btn primary" disabled={chatPending}>
-                {chatPending ? "Sending..." : "Send"}
-              </button>
-            </form>
-          </div>
-        )}
-      </div>
+      <ChatWidget
+        habits={habits}
+        statsById={statsById}
+        durationById={durationById}
+        chatMessages={chatMessages}
+        chatPending={chatPending}
+        chatError={chatError}
+        chatDraft={chatDraft}
+        setChatDraft={setChatDraft}
+        sendChatMessage={sendChatMessage}
+        chatOpen={chatOpen}
+        setChatOpen={setChatOpen}
+      />
     </div>
   );
 }
