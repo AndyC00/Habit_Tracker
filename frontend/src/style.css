@@ -495,6 +495,26 @@
   color: #fff;
 }
 
+.chat-quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #222;
+  background: #101010;
+}
+
+.chat-quick {
+  padding: 8px 10px;
+  background: #1f3a63;
+  border-color: #2b4f87;
+  font-weight: 700;
+}
+
+.chat-quick:disabled {
+  opacity: 0.7;
+}
+
 .chat-body {
   padding: 12px 14px;
   max-height: 260px;

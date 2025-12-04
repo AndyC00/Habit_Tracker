@@ -32,6 +32,8 @@ exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || "{}");
     const messages = Array.isArray(body.messages) ? body.messages : [];
+    const habitContext =
+      typeof body.habitContext === "string" ? body.habitContext.trim() : "";
     const trimmed = messages
       .map((m) => ({
         role: m.role,
@@ -63,8 +65,14 @@ exports.handler = async (event) => {
             role: "system",
             content: "You are a concise, friendly assistant for a habit tracker app.",
           },
+          habitContext
+            ? {
+                role: "system",
+                content: `Habit context from user:\n${habitContext}`,
+              }
+            : null,
           ...trimmed,
-        ],
+        ].filter(Boolean),
       }),
     });
 
