@@ -1,5 +1,6 @@
 const ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
-const API_KEY = process.env.CLOUDFLARE_API_KEY;
+const API_TOKEN = process.env.CLOUDFLARE_API_KEY || process.env.CLOUDFLARE_API_TOKEN;
+const API_EMAIL = process.env.CLOUDFLARE_API_EMAIL;
 const MODEL = "@cf/meta/llama-3-8b-instruct";
 
 exports.handler = async (event) => {
@@ -21,7 +22,7 @@ exports.handler = async (event) => {
     };
   }
 
-  if (!ACCOUNT_ID || !API_KEY) {
+  if (!ACCOUNT_ID || !API_TOKEN) {
     return {
       statusCode: 500,
       headers,
@@ -53,12 +54,27 @@ exports.handler = async (event) => {
       MODEL
     )}`;
 
+    const headersPayload = {
+      "Content-Type": "application/json",
+    };
+
+    // Prefer API token (Workers AI token). If unavailable but we have email + global key, fall back.
+    if (API_TOKEN && !API_EMAIL) {
+      headersPayload.Authorization = `Bearer ${API_TOKEN}`;
+    } else if (API_TOKEN && API_EMAIL) {
+      headersPayload["X-Auth-Email"] = API_EMAIL;
+      headersPayload["X-Auth-Key"] = API_TOKEN;
+    } else {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: "Cloudflare authentication not configured" }),
+      };
+    }
+
     const aiRes = await fetch(url, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: headersPayload,
       body: JSON.stringify({
         messages: [
           {

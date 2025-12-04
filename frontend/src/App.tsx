@@ -238,7 +238,8 @@ export default function App() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data?.error || "Chat request failed.");
+        const detail = typeof data === "object" ? JSON.stringify(data) : "";
+        throw new Error(data?.error || `Chat request failed (${res.status}) ${detail}`);
       }
 
       const reply = data?.reply;
