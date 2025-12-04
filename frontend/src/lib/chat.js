@@ -50,9 +50,8 @@ exports.handler = async (event) => {
       };
     }
 
-    const url = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/${encodeURIComponent(
-      MODEL
-    )}`;
+    const normalizedModel = MODEL.startsWith("@") ? MODEL : `@${MODEL}`;
+    const url = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/${normalizedModel}`;
 
     const headersPayload = {
       "Content-Type": "application/json",
@@ -74,13 +73,14 @@ exports.handler = async (event) => {
 
     const aiRes = await fetch(url, {
       method: "POST",
-      headers: headersPayload,
-      body: JSON.stringify({
-        messages: [
-          {
-            role: "system",
-            content: "You are a concise, friendly assistant for a habit tracker app.",
-          },
+        headers: headersPayload,
+        body: JSON.stringify({
+          model: normalizedModel,
+          messages: [
+            {
+              role: "system",
+              content: "You are a concise, friendly assistant for a habit tracker app.",
+            },
           habitContext
             ? {
                 role: "system",
