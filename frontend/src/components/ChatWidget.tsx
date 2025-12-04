@@ -53,7 +53,7 @@ export default function ChatWidget({
       <button
         className="chat-toggle"
         type="button"
-        onClick={() => setChatOpen((prev) => !prev)}
+        onClick={() => setChatOpen(!chatOpen)}
       >
         Chat
       </button>
