@@ -604,3 +604,136 @@
   color: #ff8686;
   font-weight: 600;
 }
+
+/* Quick timer rail */
+.timer-rail {
+  position: fixed;
+  left: 16px;
+  top: 140px;
+  width: 140px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #2c2c2c;
+  background: #0f0f0f;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 22;
+}
+
+.timer-rail-title {
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: #d9e5ff;
+}
+
+.timer-rail-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timer-btn {
+  width: 100%;
+  background: #1f3a63;
+  border-color: #2b4f87;
+  font-weight: 700;
+}
+
+.timer-btn.active {
+  background: linear-gradient(135deg, #44b0de, #2f7d32);
+  border-color: #44b0de;
+}
+
+.timer-status {
+  background: #111;
+  border: 1px solid #242424;
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timer-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.timer-cancel {
+  border: none;
+  background: #ff6b6b;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.timer-remaining {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.timer-progress {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: #1a1a1a;
+  overflow: hidden;
+}
+
+.timer-progress-bar {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #44b0de, #2f7d32);
+  transform-origin: left center;
+  transition: width 0.2s ease;
+}
+
+.timer-finished {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #2c2c2c;
+  background: #121212;
+  font-weight: 700;
+  color: #9be3ae;
+}
+
+@media (max-width: 720px) {
+  .timer-rail {
+    top: auto;
+    bottom: 16px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .timer-rail-title {
+    width: 100%;
+  }
+
+  .timer-rail-buttons {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .timer-btn {
+    flex: 1 1 22%;
+    min-width: 70px;
+  }
+
+  .timer-status {
+    width: 100%;
+  }
+}

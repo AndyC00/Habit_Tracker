@@ -12,6 +12,7 @@ import { loadActiveHabitsWithStats, loadArchivedHabitsWithStats, getStatsForHabi
 
 import { logout } from "./lib/auth";
 import ChatWidget, { type ChatMessage } from "./components/ChatWidget";
+import SideTimerButtons from "./components/SideTimerButtons";
 
 // ------------------ constants and types ------------------
 type HabitFormValues = {
@@ -974,6 +975,7 @@ export default function App() {
         chatOpen={chatOpen}
         setChatOpen={setChatOpen}
       />
+      <SideTimerButtons />
     </div>
   );
 }
