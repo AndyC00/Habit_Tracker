@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Dumbbell, BookOpen, Droplet, Moon, Code, Music, Coffee, Target, Timer, Circle } from "lucide-react";
+import { Dumbbell, BookOpen, Droplet, Moon, Code, Music, Coffee, Target, Timer, Circle, ThermometerSun } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
@@ -148,6 +148,8 @@ export default function App() {
   const [formError, setFormError] = useState<string | null>(null);
   const [formPending, setFormPending] = useState(false);
   const [now, setNow] = useState<Date>(new Date());
+  const [localTempC, setLocalTempC] = useState<number | null>(null);
+  const [tempStatus, setTempStatus] = useState<"idle" | "loading" | "error" | "unsupported">("loading");
 
   // --- inner functions ---
   function handleDonate() {
@@ -263,6 +265,74 @@ export default function App() {
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let lastCoords: { lat: number; lon: number } | null = null;
+    let hasFetchedTemp = false;
+
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setTempStatus("unsupported");
+      return;
+    }
+
+    async function fetchTemperature(lat: number, lon: number, showLoading: boolean) {
+      if (showLoading) {
+        setTempStatus("loading");
+      }
+      try {
+        const res = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`,
+        );
+        const data = await res.json();
+        if (cancelled) return;
+
+        const temp = data?.current_weather?.temperature;
+        if (typeof temp === "number") {
+          hasFetchedTemp = true;
+          setLocalTempC(temp);
+          setTempStatus("idle");
+        } else {
+          throw new Error("Missing temperature");
+        }
+      } catch (e) {
+        if (!cancelled) setTempStatus("error");
+      }
+    }
+
+    const requestTemperature = (showLoading: boolean) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (cancelled) return;
+          const coords = {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+          };
+          lastCoords = coords;
+          fetchTemperature(coords.lat, coords.lon, showLoading);
+        },
+        () => {
+          if (!cancelled) setTempStatus("error");
+        },
+        { enableHighAccuracy: false, timeout: 7000, maximumAge: 15 * 60 * 1000 },
+      );
+    };
+
+    requestTemperature(true);
+
+    const refreshId = window.setInterval(() => {
+      if (lastCoords) {
+        fetchTemperature(lastCoords.lat, lastCoords.lon, !hasFetchedTemp);
+      } else {
+        requestTemperature(!hasFetchedTemp);
+      }
+    }, 15 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(refreshId);
+    };
   }, []);
 
   async function checkIn(habitId: number) {
@@ -398,22 +468,37 @@ export default function App() {
   if (loading) return <div className="loading">Loading…</div>;
   if (error) return <div className="error">{error}</div>;
 
+  const timeString = new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZoneName: "short",
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }).format(now);
+
+  const temperatureLabel = (() => {
+    if (localTempC !== null) {
+      return `Local ${Math.round(localTempC)}\u00b0C`;
+    }
+    if (tempStatus === "unsupported") return "Local temp unavailable";
+    if (tempStatus === "error") return "Temperature unavailable";
+    return "Loading local temp...";
+  })();
+
   // --- output ---
   return (
     <div className="container">
       <h1>Habit Tracker</h1>
-      <div style={{ marginBottom: 12, opacity: 0.85 }}>
-        {new Intl.DateTimeFormat(undefined, {
-          year: "numeric",
-          month: "short",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false,
-          timeZoneName: "short",
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }).format(now)}
+      <div className="time-weather-row">
+        <span>{timeString}</span>
+        <span className="local-temp">
+          <ThermometerSun size={16} />
+          <span>{temperatureLabel}</span>
+        </span>
       </div>
 
       <button className="logoutbtn" onClick={handleLogout}>
@@ -913,4 +998,3 @@ function DonatePaymentForm({
     </form>
   );
 }
-
