@@ -1,3 +1,34 @@
+const fs = require("fs");
+const path = require("path");
+
+function loadLocalEnv() {
+  // When running locally (Netlify dev / npm run dev), try to hydrate process.env from frontend/.env
+  const candidates = [
+    path.resolve(process.cwd(), "frontend", ".env"), // running from repo root
+    path.resolve(process.cwd(), ".env"), // running from frontend folder
+  ];
+
+  const target = candidates.find((p) => fs.existsSync(p));
+  if (!target) return;
+
+  const lines = fs.readFileSync(target, "utf8").split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+    const [rawKey, ...rest] = trimmed.split("=");
+    const key = rawKey.trim();
+    const value = rest.join("=").trim();
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  }
+}
+
+// Only attempt to load from file when not in production deploys.
+if (process.env.NETLIFY_DEV === "true" || process.env.NETLIFY_LOCAL === "true" || process.env.NODE_ENV !== "production") {
+  loadLocalEnv();
+}
+
 const ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const API_TOKEN = process.env.CLOUDFLARE_API_KEY || process.env.CLOUDFLARE_API_TOKEN;
 const API_EMAIL = process.env.CLOUDFLARE_API_EMAIL;
