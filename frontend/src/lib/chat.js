@@ -30,9 +30,29 @@ if (process.env.NETLIFY_DEV === "true" || process.env.NETLIFY_LOCAL === "true" |
 }
 
 const ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
-const API_TOKEN = process.env.CLOUDFLARE_API_KEY || process.env.CLOUDFLARE_API_TOKEN;
+const API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
+const API_KEY = process.env.CLOUDFLARE_API_KEY;
 const API_EMAIL = process.env.CLOUDFLARE_API_EMAIL;
 const MODEL = "@cf/meta/llama-3-8b-instruct";
+
+function buildAuthHeaders() {
+  // Prefer scoped token for Workers AI
+  if (API_TOKEN) {
+    return { Authorization: `Bearer ${API_TOKEN}` };
+  }
+
+  // Fallback: global API key requires email header
+  if (API_KEY && API_EMAIL) {
+    return {
+      "X-Auth-Email": API_EMAIL,
+      "X-Auth-Key": API_KEY,
+    };
+  }
+
+  throw new Error(
+    "Cloudflare auth missing. Set CLOUDFLARE_API_TOKEN, or set both CLOUDFLARE_API_KEY and CLOUDFLARE_API_EMAIL."
+  );
+}
 
 exports.handler = async (event) => {
   const headers = {
@@ -53,11 +73,15 @@ exports.handler = async (event) => {
     };
   }
 
-  if (!ACCOUNT_ID || !API_TOKEN) {
+  if (!ACCOUNT_ID || (!API_TOKEN && !API_KEY)) {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: "Cloudflare credentials missing" }),
+      body: JSON.stringify({
+        error: "Cloudflare credentials missing",
+        detail:
+          "Set CLOUDFLARE_ACCOUNT_ID and either CLOUDFLARE_API_TOKEN, or CLOUDFLARE_API_KEY plus CLOUDFLARE_API_EMAIL.",
+      }),
     };
   }
 
@@ -86,21 +110,8 @@ exports.handler = async (event) => {
 
     const headersPayload = {
       "Content-Type": "application/json",
+      ...buildAuthHeaders(),
     };
-
-    // Prefer API token (Workers AI token). If unavailable but we have email + global key, fall back.
-    if (API_TOKEN && !API_EMAIL) {
-      headersPayload.Authorization = `Bearer ${API_TOKEN}`;
-    } else if (API_TOKEN && API_EMAIL) {
-      headersPayload["X-Auth-Email"] = API_EMAIL;
-      headersPayload["X-Auth-Key"] = API_TOKEN;
-    } else {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: "Cloudflare authentication not configured" }),
-      };
-    }
 
     const aiRes = await fetch(url, {
       method: "POST",
@@ -124,7 +135,15 @@ exports.handler = async (event) => {
       }),
     });
 
-    const data = await aiRes.json();
+    const dataText = await aiRes.text();
+    let data = null;
+    if (dataText) {
+      try {
+        data = JSON.parse(dataText);
+      } catch (err) {
+        console.error("Failed to parse Cloudflare AI response:", err);
+      }
+    }
 
     if (!aiRes.ok) {
       const errorMessage =
