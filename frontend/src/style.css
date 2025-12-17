@@ -24,7 +24,8 @@
   opacity: 0.85;
 }
 
-.local-temp {
+.local-temp,
+.local-weather {
   display: inline-flex;
   align-items: center;
   gap: 6px;

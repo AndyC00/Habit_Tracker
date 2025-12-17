@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Dumbbell, BookOpen, Droplet, Moon, Code, Music, Coffee, Target, Timer, Circle, ThermometerSun } from "lucide-react";
+import { Dumbbell, BookOpen, Droplet, Moon, Code, Music, Coffee, Target, Timer, Circle, ThermometerSun, CloudSun } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
@@ -59,6 +59,25 @@ function todayLocalISO(): string {
 function getIconByKey(key?: string | null): LucideIcon {
   if (!key) return DEFAULT_ICON;
   return (ICONS as Record<string, LucideIcon>)[key] ?? DEFAULT_ICON;
+}
+
+function describeWeatherCode(code: number): string {
+  if (code === 0) return "Clear sky";
+  if (code === 1) return "Mostly clear";
+  if (code === 2) return "Partly cloudy";
+  if (code === 3) return "Overcast";
+  if (code === 45 || code === 48) return "Fog";
+  if (code === 51 || code === 53 || code === 55) return "Drizzle";
+  if (code === 56 || code === 57) return "Freezing drizzle";
+  if (code === 61 || code === 63 || code === 65) return "Rain";
+  if (code === 66 || code === 67) return "Freezing rain";
+  if (code === 71 || code === 73 || code === 75) return "Snowfall";
+  if (code === 77) return "Snow grains";
+  if (code === 80 || code === 81 || code === 82) return "Rain showers";
+  if (code === 85 || code === 86) return "Snow showers";
+  if (code === 95) return "Thunderstorm";
+  if (code === 96 || code === 99) return "Thunderstorm with hail";
+  return "Weather unavailable";
 }
 
 const ICON_OPTIONS: { key: IconKey; label: string }[] = [
@@ -149,6 +168,7 @@ export default function App() {
   const [formPending, setFormPending] = useState(false);
   const [now, setNow] = useState<Date>(new Date());
   const [localTempC, setLocalTempC] = useState<number | null>(null);
+  const [localWeather, setLocalWeather] = useState<string | null>(null);
   const [tempStatus, setTempStatus] = useState<"idle" | "loading" | "error" | "unsupported">("loading");
 
   // --- inner functions ---
@@ -274,6 +294,7 @@ export default function App() {
 
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setTempStatus("unsupported");
+      setLocalWeather(null);
       return;
     }
 
@@ -289,15 +310,24 @@ export default function App() {
         if (cancelled) return;
 
         const temp = data?.current_weather?.temperature;
+        const weatherCode = data?.current_weather?.weathercode;
         if (typeof temp === "number") {
           hasFetchedTemp = true;
           setLocalTempC(temp);
+          if (typeof weatherCode === "number") {
+            setLocalWeather(describeWeatherCode(weatherCode));
+          } else {
+            setLocalWeather(null);
+          }
           setTempStatus("idle");
         } else {
           throw new Error("Missing temperature");
         }
       } catch (e) {
-        if (!cancelled) setTempStatus("error");
+        if (!cancelled) {
+          setLocalWeather(null);
+          setTempStatus("error");
+        }
       }
     }
 
@@ -313,7 +343,10 @@ export default function App() {
           fetchTemperature(coords.lat, coords.lon, showLoading);
         },
         () => {
-          if (!cancelled) setTempStatus("error");
+          if (!cancelled) {
+            setLocalWeather(null);
+            setTempStatus("error");
+          }
         },
         { enableHighAccuracy: false, timeout: 7000, maximumAge: 15 * 60 * 1000 },
       );
@@ -489,6 +522,14 @@ export default function App() {
     return "Loading local temp...";
   })();
 
+  const weatherLabel = (() => {
+    if (localWeather) return localWeather;
+    if (tempStatus === "unsupported") return "Local weather unavailable";
+    if (tempStatus === "error") return "Weather unavailable";
+    if (tempStatus === "idle") return "Weather unavailable";
+    return "Loading local weather...";
+  })();
+
   // --- output ---
   return (
     <div className="container">
@@ -498,6 +539,10 @@ export default function App() {
         <span className="local-temp">
           <ThermometerSun size={16} />
           <span>{temperatureLabel}</span>
+        </span>
+        <span className="local-weather">
+          <CloudSun size={16} />
+          <span>{weatherLabel}</span>
         </span>
       </div>
 
