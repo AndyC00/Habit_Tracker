@@ -37,7 +37,8 @@ const ICONS = {
 
 type IconKey = keyof typeof ICONS;
 const DEFAULT_ICON: LucideIcon = Circle;
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
+const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
 
 // ------------------ helper functions ------------------
 async function handleLogout() {
@@ -147,7 +148,9 @@ export default function App() {
   const [chatDraft, setChatDraft] = useState("");
   const [chatPending, setChatPending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
-  const functionsBase = (import.meta.env.VITE_FUNCTIONS_URL || "").replace(/\/$/, "");
+  const functionsBase =
+    (import.meta.env.VITE_FUNCTIONS_URL || "").replace(/\/$/, "") ||
+    (import.meta.env.DEV ? "http://localhost:8888" : "");
 
   const defaultFormValues: HabitFormValues = {
     name: "",
@@ -240,11 +243,27 @@ export default function App() {
         body: JSON.stringify({ messages: history, habitContext }),
       });
 
-      const data = await res.json();
+      const raw = await res.text();
+      let data: any = null;
+      let parseError: Error | null = null;
+      if (raw) {
+        try {
+          data = JSON.parse(raw);
+        } catch (err: any) {
+          parseError = err;
+        }
+      }
 
       if (!res.ok) {
         const detail = typeof data === "object" ? JSON.stringify(data) : "";
+        if (res.status === 404) {
+          throw new Error("Chat function not found (404). Are Netlify functions running? Try `netlify dev`.");
+        }
         throw new Error(data?.error || `Chat request failed (${res.status}) ${detail}`);
+      }
+
+      if (parseError) {
+        throw new Error(`Invalid chat response: ${parseError.message || "parse error"}`);
       }
 
       const reply = data?.reply;
@@ -616,17 +635,23 @@ export default function App() {
             )}
 
             {donateClientSecret ? (
-              <Elements
-                key={donateClientSecret}
-                stripe={stripePromise}
-                options={{ clientSecret: donateClientSecret }}
-              >
-                <DonatePaymentForm
-                  onClose={() => setDonateOpen(false)}
-                  setStatus={setDonateStatus}
-                  setError={setDonateError}
-                />
-              </Elements>
+              stripePromise ? (
+                <Elements
+                  key={donateClientSecret}
+                  stripe={stripePromise}
+                  options={{ clientSecret: donateClientSecret }}
+                >
+                  <DonatePaymentForm
+                    onClose={() => setDonateOpen(false)}
+                    setStatus={setDonateStatus}
+                    setError={setDonateError}
+                  />
+                </Elements>
+              ) : (
+                <div className="habit-form-error">
+                  Missing Stripe publishable key. Set VITE_STRIPE_PUBLISHABLE_KEY to use donations.
+                </div>
+              )
             ) : (
               <div className="habit-form-actions">
                 <button
