@@ -15,6 +15,10 @@
   --muted: rgba(148, 163, 184, 0.8);
   --accent: #38bdf8;
   --accent-2: #2563eb;
+  --button-pad-y: clamp(8px, 1.6vw, 10px);
+  --button-pad-x: clamp(10px, 2.8vw, 14px);
+  --button-radius: clamp(10px, 2.6vw, 12px);
+  --button-font-size: clamp(0.95rem, 0.92rem + 0.25vw, 1rem);
 }
 
 * {
@@ -215,12 +219,13 @@ label {
 }
 
 .logoutbtn {
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: var(--button-pad-y) var(--button-pad-x);
+  border-radius: var(--button-radius);
   border: 1px solid rgba(59, 130, 246, 0.5);
   background: linear-gradient(120deg, #0ea5e9, #2563eb);
   color: #f8fafc;
   font-weight: 700;
+  font-size: var(--button-font-size);
   cursor: pointer;
   box-shadow: 0 18px 40px rgba(37, 99, 235, 0.28);
   transition: transform 0.1s ease, box-shadow 0.15s ease;
@@ -233,8 +238,8 @@ label {
 }
 
 .donate {
-  padding: 10px 14px;
-  border-radius: 14px;
+  padding: var(--button-pad-y) var(--button-pad-x);
+  border-radius: calc(var(--button-radius) + 2px);
   border: 1px solid rgba(234, 179, 8, 0.6);
   background: linear-gradient(130deg, #fbbf24, #f97316);
   color: #0f172a;
@@ -244,6 +249,7 @@ label {
   right: 16px;
   z-index: 9;
   font-weight: 800;
+  font-size: var(--button-font-size);
   box-shadow: 0 18px 42px rgba(251, 191, 36, 0.35);
   transition: transform 0.1s ease, box-shadow 0.15s ease;
 }
@@ -268,13 +274,14 @@ label {
 }
 
 .btn {
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: var(--button-pad-y) var(--button-pad-x);
+  border-radius: var(--button-radius);
   border: 1px solid var(--border);
   background: rgba(15, 23, 42, 0.82);
   color: #e2e8f0;
   cursor: pointer;
   font-weight: 700;
+  font-size: var(--button-font-size);
   transition: transform 0.1s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.2s ease;
   box-shadow: 0 12px 28px rgba(7, 14, 30, 0.35);
 }
@@ -376,9 +383,14 @@ label {
 }
 
 .habit-chart-close {
+  padding: var(--button-pad-y) var(--button-pad-x);
+  border-radius: var(--button-radius);
+  border: 1px solid #ef4444;
   background: #ef4444;
   color: #fff;
   border-color: #ef4444;
+  font-weight: 700;
+  font-size: var(--button-font-size);
 }
 
 .habit-form {
@@ -518,13 +530,14 @@ label {
 
 .auth-container button[type="submit"] {
   margin-top: 4px;
-  padding: 12px 14px;
+  padding: calc(var(--button-pad-y) + 2px) var(--button-pad-x);
   width: 100%;
-  border-radius: 12px;
+  border-radius: var(--button-radius);
   border: 1px solid transparent;
   background: linear-gradient(120deg, #0ea5e9, #2563eb);
   color: #f8fafc;
   font-weight: 800;
+  font-size: var(--button-font-size);
   cursor: pointer;
   box-shadow: 0 20px 45px rgba(56, 189, 248, 0.32);
   transition: transform 0.08s ease, filter 0.15s ease, box-shadow 0.2s ease;
@@ -575,11 +588,12 @@ label {
 .chat-toggle {
   border: none;
   border-radius: 999px;
-  padding: 12px 16px;
+  padding: calc(var(--button-pad-y) + 2px) calc(var(--button-pad-x) + 2px);
   background: linear-gradient(125deg, #0ea5e9, #6366f1);
   color: #fff;
   cursor: pointer;
   font-weight: 800;
+  font-size: var(--button-font-size);
   box-shadow: 0 16px 36px rgba(8, 15, 35, 0.45), 0 0 32px rgba(56, 189, 248, 0.35);
 }
 
@@ -617,7 +631,7 @@ label {
   background: none;
   border: none;
   color: #cbd5e1;
-  font-size: 18px;
+  font-size: clamp(16px, 3vw, 18px);
   cursor: pointer;
 }
 
@@ -794,10 +808,11 @@ label {
   border: none;
   background: #ef4444;
   color: #fff;
-  padding: 6px 10px;
-  border-radius: 10px;
+  padding: calc(var(--button-pad-y) - 2px) calc(var(--button-pad-x) - 2px);
+  border-radius: var(--button-radius);
   cursor: pointer;
   font-weight: 700;
+  font-size: var(--button-font-size);
 }
 
 .timer-remaining {
