@@ -226,6 +226,12 @@ label {
   z-index: 1;
 }
 
+.habit-actions .row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .logoutbtn {
   padding: var(--button-pad-y) var(--button-pad-x);
   border-radius: var(--button-radius);
@@ -859,6 +865,25 @@ label {
   .top-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .habit-actions {
+    gap: 12px;
+  }
+
+  .habit-actions .row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .habit-actions .row > * {
+    margin-left: 0 !important;
+    width: 100%;
+  }
+
+  .habit-actions .row input {
+    width: 100% !important;
   }
 
   .timer-rail {
