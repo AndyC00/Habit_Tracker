@@ -1,5 +1,5 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import { initializeFirestore, type Firestore } from "firebase/firestore";
 import { getAuth, onAuthStateChanged, signInAnonymously, setPersistence, browserLocalPersistence, type Auth } from "firebase/auth";
 
 let app: FirebaseApp;
@@ -7,6 +7,11 @@ let db: Firestore;
 let auth: Auth;
 
 const useAnonAuth = (import.meta.env.VITE_ENABLE_ANON_AUTH || "").toLowerCase() === "true";
+const firestoreSettings = {
+  // Force HTTP long polling to avoid QUIC idle timeouts seen on some networks
+  experimentalForceLongPolling: true,
+  useFetchStreams: false,
+} as const;
 
 let authReady: Promise<void> = Promise.resolve();
 if (useAnonAuth) {
@@ -37,7 +42,7 @@ export function getFirebase() {
     } as const;
 
     app = initializeApp(config as any);
-    db  = getFirestore(app);
+    db = initializeFirestore(app, firestoreSettings);
     auth = getAuth(app);
     // Ensure auth state persists across tabs and reloads (explicitly set)
     setPersistence(auth, browserLocalPersistence).catch(() => {});

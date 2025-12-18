@@ -34,6 +34,15 @@ const API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const API_KEY = process.env.CLOUDFLARE_API_KEY;
 const API_EMAIL = process.env.CLOUDFLARE_API_EMAIL;
 const MODEL = "@cf/meta/llama-3-8b-instruct";
+const DEFAULT_TIMEOUT_MS = Number(process.env.CF_AI_TIMEOUT_MS || 8000);
+
+function fetchWithTimeout(url, options, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timeout = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  return fetch(url, { ...options, signal: controller?.signal }).finally(() => {
+    if (timeout) clearTimeout(timeout);
+  });
+}
 
 function buildAuthHeaders() {
   // Prefer scoped token for Workers AI
@@ -113,7 +122,7 @@ exports.handler = async (event) => {
       ...buildAuthHeaders(),
     };
 
-    const aiRes = await fetch(url, {
+    const aiRes = await fetchWithTimeout(url, {
       method: "POST",
         headers: headersPayload,
         body: JSON.stringify({
@@ -174,11 +183,12 @@ exports.handler = async (event) => {
       body: JSON.stringify({ reply }),
     };
   } catch (error) {
+      const isTimeout = error?.name === "AbortError";
       console.error("Chat function error:", error);
     return {
-      statusCode: 500,
+      statusCode: isTimeout ? 504 : 500,
       headers,
-      body: JSON.stringify({ error: error.message || "Unexpected error" }),
+      body: JSON.stringify({ error: isTimeout ? "Cloudflare AI request timed out. Please try again." : error.message || "Unexpected error" }),
     };
   }
 };
