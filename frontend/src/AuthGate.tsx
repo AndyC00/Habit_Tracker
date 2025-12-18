@@ -35,29 +35,31 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   if (loading) return <div>Loading authentication…</div>;
   if (!user) {
     return (
-      <div className="auth-container">
-        <h2>{mode === "login" ? "Sign In" : "Register"}</h2>
-        <form onSubmit={handleSubmit} autoComplete="on">
-          <label>Email
-            <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </label>
-          <label>Password
-            <input
-              type="password"
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </label>
-          {error && <p className="error">{error}</p>}
-          <button type="submit">{mode === "login" ? "Sign In" : "Register"}</button>
-        </form>
-        {mode === "login" ? (
-          <p>New user? <button onClick={() => setMode("register")}>Create an account</button></p>
-        ) : (
-          <p>Already have an account? <button onClick={() => setMode("login")}>Sign in</button></p>
-        )}
+      <div className="auth-screen">
+        <div className="auth-container">
+          <h2>{mode === "login" ? "Sign In" : "Register"}</h2>
+          <form className="auth-form" onSubmit={handleSubmit} autoComplete="on">
+            <label>Email
+              <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </label>
+            <label>Password
+              <input
+                type="password"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </label>
+            {error && <p className="error">{error}</p>}
+            <button type="submit">{mode === "login" ? "Sign In" : "Register"}</button>
+          </form>
+          {mode === "login" ? (
+            <p>New user? <button onClick={() => setMode("register")}>Create an account</button></p>
+          ) : (
+            <p>Already have an account? <button onClick={() => setMode("login")}>Sign in</button></p>
+          )}
+        </div>
       </div>
     );
   }
