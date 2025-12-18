@@ -735,6 +735,28 @@ label {
   font-weight: 700;
 }
 
+@media (max-width: 720px) {
+  .chat-widget {
+    inset: 0;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 12px;
+  }
+
+  .chat-panel {
+    width: 100%;
+    max-width: none;
+    height: 100vh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .chat-body {
+    max-height: none;
+    flex: 1;
+  }
+}
+
 .timer-rail {
   position: fixed;
   left: 16px;
