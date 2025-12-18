@@ -877,3 +877,27 @@ label {
     width: 100%;
   }
 }
+
+@media (max-width: 720px) {
+  .habit-chart-overlay {
+    padding: 0;
+    align-items: flex-start;
+  }
+
+  .habit-chart-inner {
+    width: 100vw;
+    max-width: none;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  .chart {
+    width: 100%;
+  }
+
+  .chart svg {
+    width: 100%;
+    height: auto;
+  }
+}
