@@ -552,27 +552,28 @@ export default function App() {
 
   // --- output ---
   return (
-    <div className="container space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-sky-50">Habit Tracker</h1>
-      <div className="time-weather-row text-sm sm:text-base">
-        <span className="font-semibold text-slate-200/90">{timeString}</span>
-        <span className="local-temp shadow-lg shadow-sky-900/40">
-          <ThermometerSun size={16} />
-          <span>{temperatureLabel}</span>
-        </span>
-        <span className="local-weather shadow-lg shadow-sky-900/40">
-          <CloudSun size={16} />
-          <span>{weatherLabel}</span>
-        </span>
-      </div>
-
-      <button className="logoutbtn" onClick={handleLogout}>
-        Logout
-      </button>
-
+    <>
       <button className="donate" onClick={handleDonate}>
-        buy me a coffee☕
+        buy me a coffee
       </button>
+      <div className="container space-y-4">
+        <h1 className="text-3xl font-semibold tracking-tight text-sky-50">Habit Tracker</h1>
+        <div className="time-weather-row text-sm sm:text-base">
+          <span className="font-semibold text-slate-200/90">{timeString}</span>
+          <span className="local-temp shadow-lg shadow-sky-900/40">
+            <ThermometerSun size={16} />
+            <span>{temperatureLabel}</span>
+          </span>
+          <span className="local-weather shadow-lg shadow-sky-900/40">
+            <CloudSun size={16} />
+            <span>{weatherLabel}</span>
+          </span>
+        </div>
+
+        <button className="logoutbtn" onClick={handleLogout}>
+          Logout
+        </button>
+        <SideTimerButtons />
 
       {donateOpen && (
         <div
@@ -1000,8 +1001,8 @@ export default function App() {
         chatOpen={chatOpen}
         setChatOpen={setChatOpen}
       />
-      <SideTimerButtons />
     </div>
+    </>
   );
 }
 
@@ -1070,3 +1071,4 @@ function DonatePaymentForm({
     </form>
   );
 }
+

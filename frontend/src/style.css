@@ -851,14 +851,10 @@ label {
 
 @media (max-width: 720px) {
   .timer-rail {
-    top: auto;
-    bottom: 16px;
-    left: 12px;
-    right: 12px;
-    width: auto;
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+    flex-direction: column;
   }
 
   .timer-rail-title {
@@ -869,11 +865,12 @@ label {
     flex-direction: row;
     flex-wrap: wrap;
     gap: 6px;
+    width: 100%;
   }
 
   .timer-btn {
-    flex: 1 1 22%;
-    min-width: 70px;
+    flex: 1 1 45%;
+    min-width: 110px;
   }
 
   .timer-status {
