@@ -3,7 +3,11 @@
   line-height: 1.5;
   font-weight: 400;
   color: #e2e8f0;
-  background: radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.08), transparent 35%), #0b1224;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(94, 234, 212, 0.12), transparent 32%),
+    radial-gradient(circle at 78% 10%, rgba(56, 189, 248, 0.14), transparent 32%),
+    radial-gradient(1200px 1200px at 15% 120%, rgba(59, 130, 246, 0.12), transparent 50%),
+    #070d1a;
   min-height: 100%;
   --surface: rgba(15, 23, 42, 0.72);
   --surface-strong: rgba(15, 23, 42, 0.9);
@@ -20,8 +24,12 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at 10% 10%, rgba(94, 234, 212, 0.04), transparent 30%),
-    radial-gradient(circle at 80% 0%, rgba(14, 165, 233, 0.06), transparent 26%),
+  background:
+    radial-gradient(circle at 10% 10%, rgba(94, 234, 212, 0.05), transparent 30%),
+    radial-gradient(circle at 80% 0%, rgba(14, 165, 233, 0.08), transparent 26%),
+    radial-gradient(circle at 40% 70%, rgba(59, 130, 246, 0.06), transparent 35%),
+    repeating-radial-gradient(circle at 14% 32%, rgba(148, 163, 184, 0.12), transparent 11px, transparent 18px),
+    linear-gradient(135deg, rgba(6, 8, 20, 0.65), rgba(7, 12, 26, 0.8)),
     #0a0f1c;
   color: #e2e8f0;
   -webkit-font-smoothing: antialiased;
@@ -368,24 +376,9 @@ label {
 }
 
 .habit-chart-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 12px;
-  border: 1px solid rgba(248, 113, 113, 0.9);
-  border-radius: 999px;
-  background: linear-gradient(135deg, #b91c1c, #ef4444);
+  background: #ef4444;
   color: #fff;
-  font-weight: 700;
-  box-shadow: 0 14px 32px rgba(239, 68, 68, 0.28);
-  transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
-}
-
-.habit-chart-close:hover {
-  transform: translateY(-1px);
-  background: linear-gradient(135deg, #dc2626, #f87171);
-  border-color: rgba(252, 165, 165, 0.95);
-  box-shadow: 0 18px 40px rgba(239, 68, 68, 0.32);
+  border-color: #ef4444;
 }
 
 .habit-form {
@@ -555,11 +548,11 @@ label {
   border: none;
   border-radius: 999px;
   padding: 12px 16px;
-  background: linear-gradient(120deg, #0ea5e9, #2563eb);
+  background: linear-gradient(125deg, #0ea5e9, #6366f1);
   color: #fff;
   cursor: pointer;
   font-weight: 800;
-  box-shadow: 0 16px 36px rgba(8, 15, 35, 0.45);
+  box-shadow: 0 16px 36px rgba(8, 15, 35, 0.45), 0 0 32px rgba(56, 189, 248, 0.35);
 }
 
 .chat-toggle:hover {
@@ -569,10 +562,13 @@ label {
 .chat-panel {
   width: 320px;
   max-width: calc(100vw - 32px);
-  background: rgba(10, 19, 36, 0.92);
+  background:
+    linear-gradient(160deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.92)),
+    radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.15), transparent 35%),
+    radial-gradient(circle at 80% 0%, rgba(129, 140, 248, 0.14), transparent 40%);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 22px 50px rgba(8, 15, 35, 0.55);
+  box-shadow: 0 22px 50px rgba(8, 15, 35, 0.55), 0 0 50px rgba(56, 189, 248, 0.14);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -584,7 +580,7 @@ label {
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  background: rgba(15, 23, 42, 0.9);
+  background: linear-gradient(120deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.9));
   border-bottom: 1px solid var(--border);
   font-weight: 700;
 }
@@ -611,7 +607,7 @@ label {
 }
 
 .chat-quick {
-  background: rgba(12, 74, 110, 0.6);
+  background: linear-gradient(130deg, rgba(14, 165, 233, 0.22), rgba(99, 102, 241, 0.26));
   border-color: rgba(14, 165, 233, 0.6);
   font-weight: 700;
 }
@@ -639,7 +635,9 @@ label {
 }
 
 .chat-bubble {
-  background: rgba(15, 23, 42, 0.85);
+  background:
+    linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.9)),
+    radial-gradient(circle at 10% 10%, rgba(14, 165, 233, 0.12), transparent 45%);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 10px 12px;
@@ -652,7 +650,7 @@ label {
 
 .chat-bubble.user {
   align-self: flex-end;
-  background: linear-gradient(140deg, rgba(14, 165, 233, 0.35), rgba(37, 99, 235, 0.45));
+  background: linear-gradient(145deg, rgba(45, 212, 191, 0.32), rgba(14, 165, 233, 0.48));
   border-color: rgba(14, 165, 233, 0.7);
 }
 
