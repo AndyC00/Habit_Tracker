@@ -34,7 +34,8 @@ const API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const API_KEY = process.env.CLOUDFLARE_API_KEY;
 const API_EMAIL = process.env.CLOUDFLARE_API_EMAIL;
 const MODEL = "@cf/meta/llama-3-8b-instruct";
-const DEFAULT_TIMEOUT_MS = Number(process.env.CF_AI_TIMEOUT_MS || 8000);
+// Allow more time for complex prompts; overridable via CF_AI_TIMEOUT_MS env
+const DEFAULT_TIMEOUT_MS = Number(process.env.CF_AI_TIMEOUT_MS || 20000);
 
 function fetchWithTimeout(url, options, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
