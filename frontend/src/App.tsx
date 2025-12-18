@@ -200,7 +200,7 @@ export default function App() {
     try {
       const cents = Math.round(donateAmount * 100);
 
-      const res = await fetch("/.netlify/functions/payment", {
+      const res = await fetch(`${functionsBase || ""}/.netlify/functions/payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: cents }),
