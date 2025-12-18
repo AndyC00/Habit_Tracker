@@ -552,15 +552,15 @@ export default function App() {
 
   // --- output ---
   return (
-    <div className="container">
-      <h1>Habit Tracker</h1>
-      <div className="time-weather-row">
-        <span>{timeString}</span>
-        <span className="local-temp">
+    <div className="container space-y-4">
+      <h1 className="text-3xl font-semibold tracking-tight text-sky-50">Habit Tracker</h1>
+      <div className="time-weather-row text-sm sm:text-base">
+        <span className="font-semibold text-slate-200/90">{timeString}</span>
+        <span className="local-temp shadow-lg shadow-sky-900/40">
           <ThermometerSun size={16} />
           <span>{temperatureLabel}</span>
         </span>
-        <span className="local-weather">
+        <span className="local-weather shadow-lg shadow-sky-900/40">
           <CloudSun size={16} />
           <span>{weatherLabel}</span>
         </span>
