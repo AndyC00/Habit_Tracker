@@ -553,11 +553,13 @@ export default function App() {
   // --- output ---
   return (
     <>
-      <button className="donate" onClick={handleDonate}>
-        buy me a coffee
-      </button>
       <div className="container space-y-4">
-        <h1 className="text-3xl font-semibold tracking-tight text-sky-50">Habit Tracker</h1>
+        <div className="top-row">
+          <h1 className="text-3xl font-semibold tracking-tight text-sky-50">Habit Tracker</h1>
+          <button className="donate" onClick={handleDonate}>
+            buy me a coffee
+          </button>
+        </div>
         <div className="time-weather-row text-sm sm:text-base">
           <span className="font-semibold text-slate-200/90">{timeString}</span>
           <span className="local-temp shadow-lg shadow-sky-900/40">
@@ -575,16 +577,16 @@ export default function App() {
         </button>
         <SideTimerButtons />
 
-      {donateOpen && (
-        <div
-          className="donate-overlay"
-          role="presentation"
-          onClick={() => !donatePending && setDonateOpen(false)}
-        >
+        {donateOpen && (
           <div
-            className="habit-form"
-            onClick={(e) => e.stopPropagation()}
+            className="donate-overlay"
+            role="presentation"
+            onClick={() => !donatePending && setDonateOpen(false)}
           >
+            <div
+              className="habit-form"
+              onClick={(e) => e.stopPropagation()}
+            >
             <h2>Support this app</h2>
             <p style={{ marginTop: 4, marginBottom: 8 }}>
               Choose an amount, create the payment intent, then enter card details to pay.
