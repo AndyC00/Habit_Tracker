@@ -50,13 +50,15 @@ export default function ChatWidget({
 
   return (
     <div className="chat-widget">
-      <button
-        className="chat-toggle"
-        type="button"
-        onClick={() => setChatOpen(!chatOpen)}
-      >
-        Chat
-      </button>
+      {!chatOpen && (
+        <button
+          className="chat-toggle"
+          type="button"
+          onClick={() => setChatOpen(true)}
+        >
+          Chat
+        </button>
+      )}
 
       {chatOpen && (
         <div className="chat-panel">
