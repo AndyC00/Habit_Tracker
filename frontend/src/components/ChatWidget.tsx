@@ -56,14 +56,14 @@ export default function ChatWidget({
           type="button"
           onClick={() => setChatOpen(true)}
         >
-          Chat
+          Habit Advice
         </button>
       )}
 
       {chatOpen && (
         <div className="chat-panel">
           <div className="chat-header">
-            <span>AI habit advisor</span>
+            <span>AI Habit Advice</span>
             <button
               type="button"
               className="chat-close"
