@@ -4,6 +4,18 @@ type ActiveTimer = {
   label: string;
   endTime: number;
   totalMs: number;
+  isPomodoro?: boolean;
+};
+
+type PomodoroPhase = {
+  label: string;
+  minutes: number;
+  kind: "focus" | "break";
+};
+
+type PomodoroState = {
+  phases: PomodoroPhase[];
+  index: number;
 };
 
 const PRESETS = [
@@ -13,6 +25,10 @@ const PRESETS = [
   { minutes: 60, label: "60mins" },
 ];
 
+const POMODORO_CYCLES = 4;
+const POMODORO_FOCUS_MIN = 25;
+const POMODORO_BREAK_MIN = 5;
+
 function formatMs(ms: number) {
   const safeMs = Math.max(0, ms);
   const totalSeconds = Math.round(safeMs / 1000);
@@ -21,10 +37,29 @@ function formatMs(ms: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function buildPomodoroPhases(): PomodoroPhase[] {
+  const phases: PomodoroPhase[] = [];
+  for (let i = 0; i < POMODORO_CYCLES; i++) {
+    const cycleNum = i + 1;
+    phases.push({
+      minutes: POMODORO_FOCUS_MIN,
+      label: `Pomodoro ${cycleNum}/${POMODORO_CYCLES}`,
+      kind: "focus",
+    });
+    phases.push({
+      minutes: POMODORO_BREAK_MIN,
+      label: `Break ${cycleNum}/${POMODORO_CYCLES}`,
+      kind: "break",
+    });
+  }
+  return phases;
+}
+
 export default function SideTimerButtons() {
   const [active, setActive] = useState<ActiveTimer | null>(null);
   const [remainingMs, setRemainingMs] = useState(0);
   const [lastFinished, setLastFinished] = useState<string | null>(null);
+  const [, setPomodoro] = useState<PomodoroState | null>(null);
   const intervalRef = useRef<number | null>(null);
   const timeoutRef = useRef<number | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -79,14 +114,37 @@ export default function SideTimerButtons() {
     oscillator.stop(ctx.currentTime + duration + 0.05);
   }
 
-  function startTimer(minutes: number, label: string) {
+  function startTimer(
+    minutes: number,
+    label: string,
+    options?: { isPomodoro?: boolean; preserveFinished?: boolean }
+  ) {
     const totalMs = minutes * 60 * 1000;
     const endTime = Date.now() + totalMs;
     clearTimers();
     ensureAudioCtx(); // warm up/resume once while the click is a user gesture
-    setActive({ label, endTime, totalMs });
+    setActive({ label, endTime, totalMs, isPomodoro: options?.isPomodoro });
     setRemainingMs(totalMs);
-    setLastFinished(null);
+    if (!options?.preserveFinished) {
+      setLastFinished(null);
+    }
+    if (!options?.isPomodoro) {
+      setPomodoro(null);
+    }
+  }
+
+  function startPomodoroPhase(phases: PomodoroPhase[], index: number, options?: { skipState?: boolean }) {
+    const phase = phases[index];
+    if (!phase) return;
+    if (!options?.skipState) {
+      setPomodoro({ phases, index });
+    }
+    startTimer(phase.minutes, phase.label, { isPomodoro: true });
+  }
+
+  function startPomodoro() {
+    const phases = buildPomodoroPhases();
+    startPomodoroPhase(phases, 0);
   }
 
   function stopActive() {
@@ -94,6 +152,7 @@ export default function SideTimerButtons() {
     setActive(null);
     setRemainingMs(0);
     setLastFinished(null);
+    setPomodoro(null);
   }
 
   useEffect(() => {
@@ -110,6 +169,17 @@ export default function SideTimerButtons() {
       setLastFinished(active.label);
       setActive(null);
       playAlarm();
+
+      setPomodoro((state) => {
+        if (!state) return null;
+        const nextIndex = state.index + 1;
+        if (nextIndex >= state.phases.length) {
+          setLastFinished("Pomodoro cycle complete");
+          return null;
+        }
+        startPomodoroPhase(state.phases, nextIndex, { skipState: true });
+        return { phases: state.phases, index: nextIndex };
+      });
     }, Math.max(0, active.endTime - Date.now()));
 
     return clearTimers;
@@ -131,6 +201,13 @@ export default function SideTimerButtons() {
             {preset.label}
           </button>
         ))}
+        <button
+          type="button"
+          className={`btn timer-btn pomodoro${active?.isPomodoro ? " active" : ""}`}
+          onClick={startPomodoro}
+        >
+          Pomodoro
+        </button>
       </div>
 
       {hasActive && active && (

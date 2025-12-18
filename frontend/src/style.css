@@ -641,9 +641,20 @@
   font-weight: 700;
 }
 
+.timer-btn.pomodoro {
+  background: #ff6347;
+  border-color: #ff7b63;
+  color: #fff;
+}
+
 .timer-btn.active {
   background: linear-gradient(135deg, #44b0de, #2f7d32);
   border-color: #44b0de;
+}
+
+.timer-btn.pomodoro.active {
+  background: linear-gradient(135deg, #ff8a6b, #ff3b30);
+  border-color: #ff8a6b;
 }
 
 .timer-status {
