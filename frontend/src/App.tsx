@@ -380,13 +380,14 @@ export default function App() {
         return;
       }
       try {
-        geoPermission = await permissions.query({ name: "geolocation" });
-        if (geoPermission.state === "granted" || geoPermission.state === "prompt") {
+        const perm: PermissionStatus = await permissions.query({ name: "geolocation" });
+        geoPermission = perm;
+        if (perm.state === "granted" || perm.state === "prompt") {
           requestTemperature(true);
         }
-        geoPermission.onchange = () => {
+        perm.onchange = () => {
           if (cancelled) return;
-          if (geoPermission?.state === "granted") {
+          if (perm.state === "granted") {
             requestTemperature(true);
           }
         };
