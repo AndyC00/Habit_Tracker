@@ -953,48 +953,32 @@ label {
   .habit-chart-inner {
     flex-direction: column;
     align-items: stretch;
-    width: min(90vw, 480px);
+    width: min(92vw, 560px);
     max-width: 100%;
     max-height: calc(100vh - 40px);
     overflow: auto;
     border-radius: 14px;
-    padding: 12px;
-    transform: scale(0.92);
-    transform-origin: center;
+    padding: 14px;
   }
 
-  .habit-chart-inner .chart,
-  .habit-chart-inner .chart-with-sidebar,
-  .habit-chart-inner .chart-sidebar {
+  .chart {
     width: 100%;
-    max-width: 100%;
   }
 
   .chart svg {
     width: 100%;
-    max-width: 100%;
     height: auto;
   }
 
   .chart-with-sidebar {
     flex-direction: column;
-    gap: 10px;
   }
 
   .chart-sidebar {
     width: 100%;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 8px;
   }
 
   .habit-chart-close {
     display: none;
-  }
-}
-
-@media (max-width: 480px) {
-  .habit-chart-inner {
-    transform: scale(0.85);
   }
 }
