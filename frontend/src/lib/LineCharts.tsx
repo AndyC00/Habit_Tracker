@@ -78,7 +78,15 @@ export function WeekChart({ habitId }: { habitId: number }) {
 
   return (
     <div className="chart">
-      <svg width={width} height={height} role="img" aria-label="7-day line chart">
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ width: "100%", height: "auto" }}
+        role="img"
+        aria-label="7-day line chart"
+      >
         <g transform={`translate(${margin.left},${margin.top})`}>
           {gridYs.map((gi) => {
             const v = yAtTick(gi);
@@ -186,7 +194,15 @@ export function MonthChart({ habitId }: { habitId: number }) {
 
   return (
     <div className="chart">
-      <svg width={width} height={height} role="img" aria-label="month line chart">
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ width: "100%", height: "auto" }}
+        role="img"
+        aria-label="month line chart"
+      >
         <g transform={`translate(${margin.left},${margin.top})`}>
           {gridYs.map((gi) => {
             const v = yAtTick(gi);
@@ -340,7 +356,15 @@ export function TotalChart({ habitId }: { habitId: number }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <div>Total Statistic ({selectedYear ?? "--"})</div>
         </div>
-        <svg width={width} height={height} role="img" aria-label="total line chart">
+        <svg
+          width={width}
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="xMidYMid meet"
+          style={{ width: "100%", height: "auto" }}
+          role="img"
+          aria-label="total line chart"
+        >
           <g transform={`translate(${margin.left},${margin.top})`}>
             {gridYs.map((gi) => {
               const v = yAtTick(gi);
