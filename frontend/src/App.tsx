@@ -311,6 +311,7 @@ export default function App() {
     let cancelled = false;
     let lastCoords: { lat: number; lon: number } | null = null;
     let hasFetchedTemp = false;
+    let geoPermission: PermissionStatus | null = null;
 
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setTempStatus("unsupported");
@@ -372,7 +373,29 @@ export default function App() {
       );
     };
 
-    requestTemperature(true);
+    async function ensurePermissionAndFetch() {
+      const permissions = (navigator as any).permissions;
+      if (!permissions?.query) {
+        requestTemperature(true);
+        return;
+      }
+      try {
+        geoPermission = await permissions.query({ name: "geolocation" });
+        if (geoPermission.state === "granted" || geoPermission.state === "prompt") {
+          requestTemperature(true);
+        }
+        geoPermission.onchange = () => {
+          if (cancelled) return;
+          if (geoPermission?.state === "granted") {
+            requestTemperature(true);
+          }
+        };
+      } catch {
+        requestTemperature(true);
+      }
+    }
+
+    ensurePermissionAndFetch();
 
     const refreshId = window.setInterval(() => {
       if (lastCoords) {
@@ -385,6 +408,9 @@ export default function App() {
     return () => {
       cancelled = true;
       clearInterval(refreshId);
+      if (geoPermission) {
+        geoPermission.onchange = null;
+      }
     };
   }, []);
 
