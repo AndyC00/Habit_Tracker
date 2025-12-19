@@ -743,18 +743,25 @@ label {
 
 @media (max-width: 720px) {
   .chat-widget {
-    inset: 0;
-    align-items: stretch;
-    justify-content: flex-start;
-    padding: 12px;
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    top: auto;
+    left: auto;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 0;
+    gap: 8px;
   }
 
   .chat-panel {
-    width: 100%;
-    max-width: none;
-    height: 100vh;
-    border-radius: 0;
-    box-shadow: none;
+    width: min(360px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    height: 50vh;
+    max-height: 50vh;
+    border-radius: 14px;
+    box-shadow: 0 18px 42px rgba(8, 15, 35, 0.5);
+    overflow: hidden;
   }
 
   .chat-body {
