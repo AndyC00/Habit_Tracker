@@ -190,6 +190,7 @@ export default function App() {
         <button className="logoutbtn" onClick={handleLogout}>
           Logout
         </button>
+        
         <SideTimerButtons />
 
         <DonationDialog

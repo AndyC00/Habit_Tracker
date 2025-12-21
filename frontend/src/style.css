@@ -786,7 +786,7 @@ label {
 .timer-rail {
   position: fixed;
   left: 16px;
-  top: 140px;
+  top: 50%;
   width: 150px;
   padding: 12px;
   border-radius: 14px;
