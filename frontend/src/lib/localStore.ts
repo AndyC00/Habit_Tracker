@@ -503,12 +503,10 @@ export async function getTotalSeries(
   tz?: string,
 ): Promise<{ date: string; minutes: number }[]> {
   const checks = await getAllChecksSorted(habitId);
-  if (checks.length === 0) return [];
 
   const today = todayInTZISO(tz);
   const targetYear = String(year ?? Number(today.slice(0, 4)));
   const filtered = checks.filter((c) => c.date.slice(0, 4) === targetYear);
-  if (filtered.length === 0) return [];
 
   const monthlyTotals = Array(12).fill(0);
   for (const rec of filtered) {
@@ -518,15 +516,10 @@ export async function getTotalSeries(
     }
   }
 
-  const result: { date: string; minutes: number }[] = [];
-  let acc = 0;
-  for (let i = 0; i < 12; i++) {
-    acc += monthlyTotals[i];
-    const month = String(i + 1).padStart(2, "0");
-    result.push({ date: `${targetYear}-${month}-01`, minutes: acc });
-  }
-
-  return result; // Jan -> Dec cumulative for selected year
+  return monthlyTotals.map((total, idx) => {
+    const month = String(idx + 1).padStart(2, "0");
+    return { date: `${targetYear}-${month}-01`, minutes: total };
+  }); // Jan -> Dec monthly totals (non-cumulative) for selected year; empty data yields zeros
 }
 
 export async function getTotalYears(habitId: number): Promise<number[]> {

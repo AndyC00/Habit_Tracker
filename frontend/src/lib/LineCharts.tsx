@@ -19,6 +19,13 @@ function toCumulative(series: Point[]): Point[] {
   });
 }
 
+function emptyYearSeries(year: number): Point[] {
+  return Array.from({ length: 12 }, (_, i) => ({
+    date: `${year}-${String(i + 1).padStart(2, "0")}-01`,
+    minutes: 0,
+  }));
+}
+
 // ------------------ Week Chart (SVG) ------------------
 export function WeekChart({ habitId }: { habitId: number }) {
   const [points, setPoints] = useState<Point[] | null>(null);
@@ -263,26 +270,22 @@ export function TotalChart({ habitId }: { habitId: number }) {
       try {
         setErr(null);
         if (isExample) {
-          setYears(EXAMPLE_TOTAL_YEARS);
-          const initialYear = EXAMPLE_TOTAL_YEARS[0] ?? null;
-          setSelectedYear(initialYear);
-          setPoints(initialYear ? toCumulative(EXAMPLE_TOTAL_SERIES_BY_YEAR[initialYear] ?? []) : []);
+          const fallbackYear = new Date().getFullYear();
+          const exampleYears = EXAMPLE_TOTAL_YEARS.length ? EXAMPLE_TOTAL_YEARS : [fallbackYear];
+          setYears(exampleYears);
+          setSelectedYear(exampleYears[0]);
           return;
         }
         const availableYears = await store.getTotalYears(habitId);
-        setYears(availableYears);
-        if (!availableYears.length) {
-          setSelectedYear(null);
-          setPoints([]);
-          return;
-        }
-        const initialYear = availableYears[0];
-        setSelectedYear(initialYear);
+        const fallbackYear = new Date().getFullYear();
+        const yearsToUse = availableYears.length ? availableYears : [fallbackYear];
+        setYears(yearsToUse);
+        setSelectedYear(yearsToUse[0]);
       } catch (e: any) {
         setErr(e.message ?? "Failed to load total series");
-        setYears([]);
-        setSelectedYear(null);
-        setPoints([]);
+        const fallbackYear = new Date().getFullYear();
+        setYears([fallbackYear]);
+        setSelectedYear(fallbackYear);
       }
     })();
   }, [habitId, isExample]);
@@ -293,27 +296,28 @@ export function TotalChart({ habitId }: { habitId: number }) {
       try {
         setErr(null);
         setPoints(null);
+        const year = selectedYear;
+        let series: Point[];
         if (isExample) {
-          const series = EXAMPLE_TOTAL_SERIES_BY_YEAR[selectedYear] ?? [];
-          setPoints(toCumulative(series));
-          return;
+          series = EXAMPLE_TOTAL_SERIES_BY_YEAR[year] ?? [];
+        } else {
+          series = await store.getTotalSeries(habitId, year);
         }
-        const series = await store.getTotalSeries(habitId, selectedYear);
         if (!series.length) {
-          setPoints([]);
-          return;
+          series = emptyYearSeries(year);
         }
         setPoints(toCumulative(series));
       } catch (e: any) {
         setErr(e.message ?? "Failed to load total series");
-        setPoints([]);
+        if (selectedYear !== null) {
+          setPoints(toCumulative(emptyYearSeries(selectedYear)));
+        }
       }
     })();
   }, [habitId, isExample, selectedYear]);
 
   if (err) return <div className="error">{err}</div>;
   if (points === null) return <div className="loading">Loading...</div>;
-  if (points.length === 0) return <div className="error">No data</div>;
 
   const values = points.map((p) => p.minutes);
   const vmax = Math.max(...values);

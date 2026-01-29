@@ -75,13 +75,10 @@ const totalDurationMinutes = durationThisMonth + 420;
 const monthlyTotalsTemplate = [320, 340, 360, 380, 400, 420, 440, 460, 480, 500, 520, 540];
 const monthIndex = now.getMonth();
 const monthlyTotals = monthlyTotalsTemplate.map((val, idx) => (idx === monthIndex ? durationThisMonth : val));
-const exampleTotalSeries: { date: string; minutes: number }[] = [];
-let acc = 0;
-for (let i = 0; i < 12; i++) {
-  acc += monthlyTotals[i];
-  const month = String(i + 1).padStart(2, "0");
-  exampleTotalSeries.push({ date: `${currentYear}-${month}-01`, minutes: acc });
-}
+const exampleTotalSeries: { date: string; minutes: number }[] = monthlyTotals.map((minutes, idx) => ({
+  date: `${currentYear}-${String(idx + 1).padStart(2, "0")}-01`,
+  minutes,
+}));
 
 export const EXAMPLE_HABIT_ID = 9999;
 
