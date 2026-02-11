@@ -9,6 +9,11 @@ export type HabitFormValues = {
   colorHex: string;
   iconKey: string;
   isArchived: boolean;
+  reminderEnabled: boolean;
+  reminderFrequency: "daily" | "weekly";
+  reminderTime: string;
+  reminderDays: number[];
+  reminderTimeZone: string;
 };
 
 export type HabitFormMode =
@@ -117,6 +122,78 @@ export function HabitFormModal({
             </span>
           </div>
         </label>
+
+        <div className="reminder-block">
+          <label className="habit-form-checkbox" style={{ marginBottom: 8 }}>
+            <input
+              type="checkbox"
+              checked={values.reminderEnabled}
+              onChange={(e) => onChange({ ...values, reminderEnabled: e.target.checked })}
+            />
+            <span>Enable reminder</span>
+          </label>
+
+          <div className="reminder-grid" aria-disabled={!values.reminderEnabled}>
+            <label>
+              Time of day (HH:mm)
+              <input
+                type="time"
+                value={values.reminderTime}
+                onChange={(e) => onChange({ ...values, reminderTime: e.target.value })}
+                disabled={!values.reminderEnabled}
+              />
+            </label>
+
+            <label>
+              Frequency
+              <select
+                value={values.reminderFrequency}
+                onChange={(e) => onChange({ ...values, reminderFrequency: e.target.value as any })}
+                disabled={!values.reminderEnabled}
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+              </select>
+            </label>
+
+            {values.reminderFrequency === "weekly" && (
+              <div className="reminder-days">
+                <span>Days of week</span>
+                <div className="reminder-day-buttons">
+                  {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((label, idx) => {
+                    const selected = values.reminderDays.includes(idx);
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        className={selected ? "day-btn selected" : "day-btn"}
+                        onClick={() => {
+                          const set = new Set(values.reminderDays);
+                          if (set.has(idx)) set.delete(idx); else set.add(idx);
+                          onChange({ ...values, reminderDays: Array.from(set).sort() });
+                        }}
+                        disabled={!values.reminderEnabled}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <label>
+              Timezone
+              <input
+                type="text"
+                value={values.reminderTimeZone}
+                onChange={(e) => onChange({ ...values, reminderTimeZone: e.target.value })}
+                disabled={!values.reminderEnabled}
+                placeholder="e.g. Pacific/Auckland"
+              />
+            </label>
+          </div>
+        </div>
 
         {mode.type === "edit" && (
           <label className="habit-form-checkbox">

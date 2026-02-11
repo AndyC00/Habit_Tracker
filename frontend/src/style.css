@@ -460,6 +460,100 @@ label {
   resize: vertical;
 }
 
+.reminder-block {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(11, 17, 32, 0.9);
+}
+
+.reminder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.reminder-days {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reminder-day-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.day-btn {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: rgba(17, 24, 39, 0.9);
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.day-btn.selected {
+  background: #0ea5e9;
+  color: #0b1220;
+  border-color: #0ea5e9;
+}
+
+.reminder-status {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(11, 17, 32, 0.75);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #cbd5e1;
+}
+
+.reminder-status .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #0ea5e9;
+  color: #0b1220;
+  font-weight: 800;
+  width: fit-content;
+}
+
+.notification-list {
+  display: grid;
+  gap: 8px;
+}
+
+.notification-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(15, 23, 42, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notification-title {
+  font-weight: 700;
+  color: #e0f2fe;
+}
+
+.notification-meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
 .habit-form-checkbox {
   display: flex;
   align-items: center;

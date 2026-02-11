@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  reminders:
+    build:
+      context: .
+      dockerfile: backend/HabitTracker.Reminders/Dockerfile
+    container_name: habit-reminders
+    ports:
+      - "6060:6060"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - REMINDER_DB_PATH=/data/reminders.db
+    volumes:
+      - reminders_data:/data
+    restart: unless-stopped
+
+volumes:
+  reminders_data: {}

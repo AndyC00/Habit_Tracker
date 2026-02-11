@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { CloudSun, ThermometerSun } from "lucide-react";
 
@@ -15,11 +15,15 @@ import { useHabitsData } from "./hooks/useHabitsData";
 import { COLOR_OPTIONS } from "./lib/habitColors";
 import { ICON_OPTIONS, getIconByKey } from "./lib/habitIcons";
 import { functionsBase } from "./lib/env";
+import * as reminders from "./lib/reminderApi";
 import { DonationDialog } from "./components/DonationDialog";
 import { HabitFormModal, type HabitFormMode, type HabitFormValues } from "./components/HabitFormModal";
 import { ArchivedHabitsModal } from "./components/ArchivedHabitsModal";
 
 type FormMode = HabitFormMode | { type: "archived" };
+
+const DEFAULT_TZ =
+  typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
 
 const defaultFormValues: HabitFormValues = {
   name: "",
@@ -27,6 +31,11 @@ const defaultFormValues: HabitFormValues = {
   colorHex: "",
   iconKey: "",
   isArchived: false,
+  reminderEnabled: false,
+  reminderFrequency: "daily",
+  reminderTime: "09:00",
+  reminderDays: [1, 2, 3, 4, 5],
+  reminderTimeZone: DEFAULT_TZ,
 };
 
 async function handleLogout() {
@@ -88,6 +97,29 @@ export default function App() {
   const [formError, setFormError] = useState<string | null>(null);
   const [formPending, setFormPending] = useState(false);
   const [openChart, setOpenChart] = useState<null | { type: "week" | "month" | "total"; habitId: number }>(null);
+  const [reminderAvailable, setReminderAvailable] = useState(false);
+  const [notifications, setNotifications] = useState<reminders.ReminderNotification[]>([]);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    reminders.health().then((ok) => setReminderAvailable(ok)).catch(() => setReminderAvailable(false));
+  }, []);
+
+  useEffect(() => {
+    if (!reminderAvailable) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const list = await reminders.listUnreadNotifications();
+        if (!cancelled) setNotifications(list);
+      } catch (e: any) {
+        if (!cancelled) setNotificationError(e?.message ?? "Failed to load reminders");
+      }
+    };
+    load();
+    const id = setInterval(load, 60000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [reminderAvailable]);
 
   function openCreateForm() {
     setFormValues(defaultFormValues);
@@ -105,7 +137,7 @@ export default function App() {
     }
   }
 
-  function openEditForm(habit: Habit) {
+  async function openEditForm(habit: Habit) {
     if (habit.isExample) return;
     setFormValues({
       name: habit.name,
@@ -113,9 +145,32 @@ export default function App() {
       colorHex: habit.colorHex ?? "",
       iconKey: habit.iconKey ?? "",
       isArchived: habit.isArchived,
+      reminderEnabled: false,
+      reminderFrequency: "daily",
+      reminderTime: "09:00",
+      reminderDays: [1, 2, 3, 4, 5],
+      reminderTimeZone: DEFAULT_TZ,
     });
     setFormMode({ type: "edit", habitId: habit.id });
     setFormError(null);
+
+    if (reminderAvailable) {
+      try {
+        const existing = await reminders.getReminderByHabitId(habit.id);
+        if (existing) {
+          setFormValues((prev) => ({
+            ...prev,
+            reminderEnabled: existing.enabled,
+            reminderFrequency: existing.frequency.toLowerCase() as "daily" | "weekly",
+            reminderTime: existing.timeOfDay,
+            reminderDays: existing.daysOfWeek ?? [],
+            reminderTimeZone: existing.timeZone || DEFAULT_TZ,
+          }));
+        }
+      } catch (e: any) {
+        console.warn("Failed to load reminder", e);
+      }
+    }
   }
 
   function closeForm() {
@@ -128,6 +183,15 @@ export default function App() {
   function normalizeOptional(value: string) {
     const trimmed = value.trim();
     return trimmed === "" ? null : trimmed;
+  }
+
+  async function markNotificationRead(id: number) {
+    try {
+      await reminders.markNotificationRead(id);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch (e: any) {
+      setNotificationError(e?.message ?? "Failed to mark read");
+    }
   }
 
   async function submitForm(event: FormEvent<HTMLFormElement>) {
@@ -149,10 +213,34 @@ export default function App() {
         iconKey: normalizeOptional(formValues.iconKey),
       };
 
+      let savedHabitId: number;
       if (formMode.type === "create") {
-        await store.createHabit(payload);
+        const created = await store.createHabit(payload);
+        savedHabitId = created.id;
       } else {
-        await store.updateHabit(formMode.habitId, { ...payload, isArchived: formValues.isArchived });
+        const updated = await store.updateHabit(formMode.habitId, { ...payload, isArchived: formValues.isArchived });
+        savedHabitId = updated.id;
+      }
+
+      if (reminderAvailable) {
+        try {
+          if (formValues.reminderEnabled) {
+            await reminders.upsertReminder({
+              habitId: savedHabitId,
+              habitName: formValues.name.trim(),
+              enabled: true,
+              frequency: formValues.reminderFrequency,
+              timeOfDay: formValues.reminderTime || "09:00",
+              daysOfWeek: formValues.reminderFrequency === "weekly" ? formValues.reminderDays : [],
+              timeZone: formValues.reminderTimeZone || DEFAULT_TZ,
+            });
+          } else {
+            await reminders.deleteReminderByHabit(savedHabitId);
+          }
+        } catch (e: any) {
+          // keep habit save success, but surface reminder error
+          setFormError(e?.message ?? "Habit saved, but reminder failed.");
+        }
       }
       await loadHabits();
       closeForm();
@@ -185,6 +273,31 @@ export default function App() {
             <CloudSun size={16} />
             <span>{weatherLabel}</span>
           </span>
+        </div>
+
+        <div className="reminder-status">
+          {reminderAvailable ? (
+            <>
+              <span>Local reminders ON</span>
+              <span className="badge">{notifications.length} unread</span>
+              {notificationError && <span className="error-text">{notificationError}</span>}
+              {notifications.length > 0 && (
+                <div className="notification-list">
+                  {notifications.map((n) => (
+                    <div key={n.id} className="notification-card">
+                      <div className="notification-title">{n.message}</div>
+                      <div className="notification-meta">Scheduled: {n.scheduledLocal}</div>
+                      <button className="btn" onClick={() => markNotificationRead(n.id)}>
+                        Mark read
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <span className="muted">Local reminders unavailable (service not running)</span>
+          )}
         </div>
 
         <button className="logoutbtn" onClick={handleLogout}>
