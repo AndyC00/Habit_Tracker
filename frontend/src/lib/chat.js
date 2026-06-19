@@ -33,7 +33,7 @@ const ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const API_KEY = process.env.CLOUDFLARE_API_KEY;
 const API_EMAIL = process.env.CLOUDFLARE_API_EMAIL;
-const MODEL = "@cf/meta/llama-3-8b-instruct";
+const MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
 // Allow more time for complex prompts; overridable via CF_AI_TIMEOUT_MS env
 const DEFAULT_TIMEOUT_MS = Number(process.env.CF_AI_TIMEOUT_MS || 25000);
 
