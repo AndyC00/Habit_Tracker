@@ -9,19 +9,19 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.1",
-    "@vitejs/plugin-react": "^5.0.4",
-    "typescript": "~5.9.3",
-    "vite": "^7.1.7"
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
+    "typescript": "~7.0.2",
+    "vite": "^8.2.1"
   },
   "dependencies": {
-    "@stripe/react-stripe-js": "^5.4.0",
-    "@stripe/stripe-js": "^8.5.2",
-    "firebase": "^11.10.0",
-    "lucide-react": "^0.545.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "stripe": "^14.0.0"
+    "@stripe/react-stripe-js": "^6.8.1",
+    "@stripe/stripe-js": "^9.13.0",
+    "firebase": "^12.17.1",
+    "lucide-react": "^1.31.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "stripe": "^22.5.0"
   }
 }
