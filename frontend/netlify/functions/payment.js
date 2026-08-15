@@ -1,29 +1,30 @@
+import Stripe from "stripe";
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-exports.handler = async (event, context) => {
+export const handler = async (event, context) => {
   // set CORS header
   const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 
   // deal with OPTIONS pre-check request
-  if (event.httpMethod === 'OPTIONS') {
+  if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
       headers,
-      body: '',
+      body: "",
     };
   }
 
   // only allow POST request
-  if (event.httpMethod !== 'POST') {
+  if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ error: 'Method not allowed' }),
+      body: JSON.stringify({ error: "Method not allowed" }),
     };
   }
 
@@ -35,7 +36,7 @@ exports.handler = async (event, context) => {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'The amount has to be more than 0.50' }),
+        body: JSON.stringify({ error: "The amount has to be more than 0.50" }),
       };
     }
 
@@ -46,11 +47,11 @@ exports.handler = async (event, context) => {
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount),
-      currency: 'nzd',
+      currency: "nzd",
       automatic_payment_methods: {
         enabled: true,
       },
-      description: 'user donation',
+      description: "user donation",
     });
 
     return {
@@ -61,7 +62,7 @@ exports.handler = async (event, context) => {
       }),
     };
   } catch (error) {
-    console.error('Stripe Error:', error);
+    console.error("Stripe Error:", error);
 
     return {
       statusCode: 500,

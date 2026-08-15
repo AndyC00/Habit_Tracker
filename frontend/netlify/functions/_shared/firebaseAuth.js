@@ -1,7 +1,7 @@
-const { cert, getApps, initializeApp } = require("firebase-admin/app");
-const { getAuth } = require("firebase-admin/auth");
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 
-class RequestAuthenticationError extends Error {}
+export class RequestAuthenticationError extends Error {}
 
 function getFirebaseAdminAuth() {
   if (getApps().length === 0) {
@@ -27,7 +27,7 @@ function getFirebaseAdminAuth() {
   return getAuth();
 }
 
-async function requireFirebaseUser(event) {
+export async function requireFirebaseUser(event) {
   if (process.env.NETLIFY_DEV === "true") {
     return { uid: "netlify-local-dev" };
   }
@@ -46,8 +46,3 @@ async function requireFirebaseUser(event) {
     throw new RequestAuthenticationError("Invalid or expired authentication token.");
   }
 }
-
-module.exports = {
-  RequestAuthenticationError,
-  requireFirebaseUser,
-};

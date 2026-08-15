@@ -1,18 +1,18 @@
-const {
+import {
   buildCloudflareAuthHeaders,
   fetchWithTimeout,
   getCloudflareAccountId,
-} = require("./_shared/cloudflare");
-const {
+} from "./_shared/cloudflare.js";
+import {
   RequestAuthenticationError,
   requireFirebaseUser,
-} = require("./_shared/firebaseAuth");
+} from "./_shared/firebaseAuth.js";
 
 const MODEL = "inworld/tts-1.5-mini";
 const MAX_TEXT_LENGTH = 2000;
 const DEFAULT_TIMEOUT_MS = Number(process.env.CF_TTS_TIMEOUT_MS || 25000);
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   const headers = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",

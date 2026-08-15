@@ -1,5 +1,5 @@
-const fs = require("fs");
-const path = require("path");
+import fs from "node:fs";
+import path from "node:path";
 
 function loadLocalEnv() {
   const candidates = [
@@ -29,13 +29,13 @@ if (
   loadLocalEnv();
 }
 
-function getCloudflareAccountId() {
+export function getCloudflareAccountId() {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   if (!accountId) throw new Error("Cloudflare account ID missing. Set CLOUDFLARE_ACCOUNT_ID.");
   return accountId;
 }
 
-function buildCloudflareAuthHeaders(options = {}) {
+export function buildCloudflareAuthHeaders(options = {}) {
   const apiToken = process.env.CLOUDFLARE_API_TOKEN;
   if (apiToken) return { Authorization: `Bearer ${apiToken}` };
 
@@ -57,7 +57,7 @@ function buildCloudflareAuthHeaders(options = {}) {
   );
 }
 
-function fetchWithTimeout(url, options, timeoutMs) {
+export function fetchWithTimeout(url, options, timeoutMs) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -65,9 +65,3 @@ function fetchWithTimeout(url, options, timeoutMs) {
     clearTimeout(timeout);
   });
 }
-
-module.exports = {
-  buildCloudflareAuthHeaders,
-  fetchWithTimeout,
-  getCloudflareAccountId,
-};
