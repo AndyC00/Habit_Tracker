@@ -1,3 +1,5 @@
+import { useState } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import type { Habit, Stats } from "../lib/localStore";
 
 export type ChatMessage = {
@@ -33,6 +35,16 @@ type ChatWidgetProps = {
   setChatOpen: (value: boolean) => void;
 };
 
+type ChatPanelSize = {
+  width: number;
+  height: number;
+};
+
+type ChatPanelStyle = CSSProperties & {
+  "--chat-panel-width"?: string;
+  "--chat-panel-height"?: string;
+};
+
 export default function ChatWidget({
   habits,
   statsById,
@@ -46,10 +58,83 @@ export default function ChatWidget({
   chatOpen,
   setChatOpen,
 }: ChatWidgetProps) {
+  const [panelSize, setPanelSize] = useState<ChatPanelSize>({ width: 320, height: 0 });
+  const [minimumPanelSize, setMinimumPanelSize] = useState<ChatPanelSize>({ width: 320, height: 0 });
+  const [hasPanelSize, setHasPanelSize] = useState(false);
+  const [hasMinimumPanelSize, setHasMinimumPanelSize] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const quickHabits = habits.filter((h) => !h.isArchived && !h.isExample).slice(0, 4);
 
+  const panelStyle: ChatPanelStyle = hasPanelSize
+    ? {
+        "--chat-panel-width": `${panelSize.width}px`,
+        "--chat-panel-height": `${panelSize.height}px`,
+      }
+    : {};
+
+  const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+
+    event.preventDefault();
+
+    const resizeHandle = event.currentTarget;
+    const panel = resizeHandle.parentElement as HTMLDivElement;
+    const panelRect = panel.getBoundingClientRect();
+    const renderedSize = { width: panelRect.width, height: panelRect.height };
+    const minimumSize = hasMinimumPanelSize ? minimumPanelSize : renderedSize;
+    const maximumSize = {
+      width: Math.max(minimumSize.width, window.innerWidth - 40),
+      height: Math.max(minimumSize.height, window.innerHeight - 40),
+    };
+    const startX = event.clientX;
+    const startY = event.clientY;
+
+    if (!hasMinimumPanelSize) {
+      setMinimumPanelSize(renderedSize);
+      setHasMinimumPanelSize(true);
+    }
+
+    setPanelSize(renderedSize);
+    setHasPanelSize(true);
+    setIsResizing(true);
+    resizeHandle.setPointerCapture(event.pointerId);
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      const width = Math.min(
+        maximumSize.width,
+        Math.max(minimumSize.width, renderedSize.width + startX - moveEvent.clientX),
+      );
+      const height = Math.min(
+        maximumSize.height,
+        Math.max(minimumSize.height, renderedSize.height + startY - moveEvent.clientY),
+      );
+
+      setPanelSize({ width, height });
+    }
+
+    function stopResize() {
+      resizeHandle.removeEventListener("pointermove", handlePointerMove);
+      resizeHandle.removeEventListener("pointerup", handlePointerEnd);
+      resizeHandle.removeEventListener("pointercancel", handlePointerEnd);
+      resizeHandle.removeEventListener("lostpointercapture", stopResize);
+      setIsResizing(false);
+    }
+
+    function handlePointerEnd(endEvent: PointerEvent) {
+      if (resizeHandle.hasPointerCapture(endEvent.pointerId)) {
+        resizeHandle.releasePointerCapture(endEvent.pointerId);
+      }
+      stopResize();
+    }
+
+    resizeHandle.addEventListener("pointermove", handlePointerMove);
+    resizeHandle.addEventListener("pointerup", handlePointerEnd);
+    resizeHandle.addEventListener("pointercancel", handlePointerEnd);
+    resizeHandle.addEventListener("lostpointercapture", stopResize);
+  };
+
   return (
-    <div className="chat-widget">
+    <div className={`chat-widget${isResizing ? " chat-widget--resizing" : ""}`}>
       {!chatOpen && (
         <button
           className="chat-toggle"
@@ -61,7 +146,15 @@ export default function ChatWidget({
       )}
 
       {chatOpen && (
-        <div className="chat-panel">
+        <div
+          className={`chat-panel${hasPanelSize ? " chat-panel--resized" : ""}`}
+          style={panelStyle}
+        >
+          <div
+            className="chat-resize-handle"
+            title="Drag to resize chat"
+            onPointerDown={startResize}
+          />
           <div className="chat-header">
             <span>AI Habit Advice</span>
             <button
