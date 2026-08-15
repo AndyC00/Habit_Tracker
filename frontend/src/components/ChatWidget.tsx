@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import type { ChatSpeechState } from "../hooks/useChatSpeech";
 import type { Habit, Stats } from "../lib/localStore";
 
 export type ChatMessage = {
@@ -31,6 +32,9 @@ type ChatWidgetProps = {
   chatDraft: string;
   setChatDraft: (value: string) => void;
   sendChatMessage: (text: string, habitContext?: string) => void;
+  speechState: ChatSpeechState;
+  playSpeech: (messageIndex: number, text: string) => void;
+  stopSpeech: () => void;
   chatOpen: boolean;
   setChatOpen: (value: boolean) => void;
 };
@@ -55,6 +59,9 @@ export default function ChatWidget({
   chatDraft,
   setChatDraft,
   sendChatMessage,
+  speechState,
+  playSpeech,
+  stopSpeech,
   chatOpen,
   setChatOpen,
 }: ChatWidgetProps) {
@@ -160,7 +167,10 @@ export default function ChatWidget({
             <button
               type="button"
               className="chat-close"
-              onClick={() => setChatOpen(false)}
+              onClick={() => {
+                stopSpeech();
+                setChatOpen(false);
+              }}
             >
               X
             </button>
@@ -197,6 +207,52 @@ export default function ChatWidget({
                   <li key={idx} className={`chat-bubble ${msg.role}`}>
                     <span className="chat-role">{msg.role === "user" ? "You" : "AI"}</span>
                     <div>{msg.content}</div>
+                    {msg.role === "assistant" && (
+                      <div className="chat-speech-row">
+                        {speechState.status === "generating" &&
+                        speechState.messageIndex === idx ? (
+                          <button type="button" className="chat-speech-button" disabled>
+                            Generating voice...
+                          </button>
+                        ) : speechState.status === "playing" &&
+                          speechState.messageIndex === idx ? (
+                          <button
+                            type="button"
+                            className="chat-speech-button"
+                            onClick={stopSpeech}
+                          >
+                            Stop voice
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="chat-speech-button"
+                            onClick={() => playSpeech(idx, msg.content)}
+                          >
+                            {speechState.status === "ready" &&
+                            speechState.messageIndex === idx
+                              ? "Replay voice"
+                              : speechState.status === "error" &&
+                                  speechState.messageIndex === idx
+                                ? "Retry voice"
+                                : "Play voice"}
+                          </button>
+                        )}
+
+                        {speechState.status === "blocked" &&
+                          speechState.messageIndex === idx && (
+                            <span className="chat-speech-status">
+                              Autoplay was blocked. Click play to listen.
+                            </span>
+                          )}
+                        {speechState.status === "error" &&
+                          speechState.messageIndex === idx && (
+                            <span className="chat-speech-status error">
+                              {speechState.message}
+                            </span>
+                          )}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

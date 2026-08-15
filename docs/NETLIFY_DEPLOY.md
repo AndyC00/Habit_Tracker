@@ -21,20 +21,34 @@ Add these environment variables in Netlify Site settings → Build & deploy → 
 - VITE_FIREBASE_APP_ID
 - VITE_ENABLE_ANON_AUTH=true   # recommended so rules can use request.auth.uid
 
-3) Netlify Build Settings
+3) Netlify Functions Secrets
+Add these server-only environment variables in Netlify Site settings. Never prefix them with `VITE_`:
+- FIREBASE_PROJECT_ID
+- FIREBASE_CLIENT_EMAIL
+- FIREBASE_PRIVATE_KEY (store PEM newlines as `\\n` if entered on one line)
+- CLOUDFLARE_ACCOUNT_ID
+- CLOUDFLARE_API_TOKEN (must allow the Workers AI and AI Gateway calls used by chat and TTS)
+- CF_AI_TIMEOUT_MS=25000 (optional)
+- CF_TTS_TIMEOUT_MS=25000 (optional)
+
+The Firebase values come from a Firebase service account. Do not commit the service account JSON or expose it to frontend code.
+
+4) Netlify Build Settings
 This repo includes `netlify.toml` with:
 - base = "frontend"
 - publish = "frontend/dist"
 - command = "npm ci && npm run build"
 It also includes SPA redirects: `frontend/public/_redirects` (/* → /index.html 200).
 
-4) Deploy
+5) Deploy
 - Push to your default branch or trigger a deploy on Netlify.
 - Verify the app loads and Firestore reads/writes succeed.
 
-5) Local Dev (optional)
+6) Local Dev (optional)
 - Create `frontend/.env.local` with the same VITE_FIREBASE_* keys.
 - Run `npm run dev` from `frontend`.
+- To test chat or TTS with the local-only login, run Netlify Functions locally and set `VITE_FUNCTIONS_URL=http://localhost:8888`.
+- Local-only authentication bypass is accepted only when the Function process has `NETLIFY_DEV=true`. A localhost frontend must not call the production chat or TTS Functions without a real Firebase ID token.
 
 Notes
 - Do NOT use service account JSON in the frontend; only use the Web SDK config.

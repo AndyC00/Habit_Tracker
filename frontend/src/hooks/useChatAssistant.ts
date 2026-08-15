@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { ChatMessage } from "../components/ChatWidget";
+import { getFunctionAuthHeaders } from "../lib/auth";
+import { useChatSpeech } from "./useChatSpeech";
 
 export function useChatAssistant(functionsBase: string) {
   const [chatOpen, setChatOpen] = useState(false);
@@ -8,6 +10,7 @@ export function useChatAssistant(functionsBase: string) {
   const [chatPending, setChatPending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const chatHistoryRef = useRef<ChatMessage[]>([]);
+  const { speechState, playSpeech, stopSpeech } = useChatSpeech(functionsBase);
 
   const sendChatMessage = useCallback(
     async (messageText: string, habitContext?: string) => {
@@ -26,9 +29,13 @@ export function useChatAssistant(functionsBase: string) {
       setChatOpen(true);
 
       try {
+        const authHeaders = await getFunctionAuthHeaders();
         const res = await fetch(`${functionsBase}/.netlify/functions/chat`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders,
+          },
           body: JSON.stringify({ messages: history, habitContext }),
         });
 
@@ -55,28 +62,29 @@ export function useChatAssistant(functionsBase: string) {
           throw new Error(`Invalid chat response: ${parseError.message || "parse error"}`);
         }
 
-      const reply = data?.reply;
-      if (!reply) {
-        throw new Error("No reply from assistant.");
-      }
+        const reply = data?.reply;
+        if (!reply) {
+          throw new Error("No reply from assistant.");
+        }
 
-      const assistantMessage: ChatMessage = {
-        role: "assistant",
-        content: typeof reply === "string" ? reply : String(reply),
-      };
+        const assistantMessage: ChatMessage = {
+          role: "assistant",
+          content: typeof reply === "string" ? reply : String(reply),
+        };
 
-      setChatMessages((prev): ChatMessage[] => {
-        const next: ChatMessage[] = [...prev, assistantMessage];
-        chatHistoryRef.current = next;
-        return next;
-      });
+        setChatMessages((prev): ChatMessage[] => {
+          const next: ChatMessage[] = [...prev, assistantMessage];
+          chatHistoryRef.current = next;
+          return next;
+        });
+        playSpeech(history.length, assistantMessage.content);
       } catch (e: any) {
         setChatError(e.message ?? "Chat failed.");
       } finally {
         setChatPending(false);
       }
     },
-    [chatPending, functionsBase],
+    [chatPending, functionsBase, playSpeech],
   );
 
   return {
@@ -88,5 +96,8 @@ export function useChatAssistant(functionsBase: string) {
     chatDraft,
     setChatDraft,
     sendChatMessage,
+    speechState,
+    playSpeech,
+    stopSpeech,
   };
 }

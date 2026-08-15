@@ -8,8 +8,9 @@ const {
   requireFirebaseUser,
 } = require("./_shared/firebaseAuth");
 
-const MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
-const DEFAULT_TIMEOUT_MS = Number(process.env.CF_AI_TIMEOUT_MS || 25000);
+const MODEL = "inworld/tts-1.5-mini";
+const MAX_TEXT_LENGTH = 2000;
+const DEFAULT_TIMEOUT_MS = Number(process.env.CF_TTS_TIMEOUT_MS || 25000);
 
 exports.handler = async (event) => {
   const headers = {
@@ -34,53 +35,44 @@ exports.handler = async (event) => {
     await requireFirebaseUser(event);
 
     const body = JSON.parse(event.body || "{}");
-    const messages = Array.isArray(body.messages) ? body.messages : [];
-    const habitContext =
-      typeof body.habitContext === "string" ? body.habitContext.trim() : "";
-    const trimmed = messages
-      .map((message) => ({
-        role: message.role,
-        content: typeof message.content === "string" ? message.content.trim() : "",
-      }))
-      .filter(
-        (message) =>
-          (message.role === "user" || message.role === "assistant") && message.content,
-      );
+    const text = typeof body.text === "string" ? body.text.trim() : "";
 
-    if (trimmed.length === 0) {
+    if (!text) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: "Missing messages" }),
+        body: JSON.stringify({ error: "Missing text" }),
+      };
+    }
+
+    if (text.length > MAX_TEXT_LENGTH) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: "Text exceeds the 2,000 character limit" }),
       };
     }
 
     const accountId = getCloudflareAccountId();
-    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${MODEL}`;
+    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run`;
     const aiRes = await fetchWithTimeout(
       url,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...buildCloudflareAuthHeaders(),
+          ...buildCloudflareAuthHeaders({ apiTokenOnly: true }),
         },
         body: JSON.stringify({
           model: MODEL,
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are a concise, friendly assistant for a habit tracker app. Respond in plain text (no markdown or symbols like **). Keep evaluation short (<=3 sentences) and clear. Provide at most 3 numbered suggestions, each under 20 words.",
-            },
-            habitContext
-              ? {
-                  role: "system",
-                  content: `Habit context from user:\n${habitContext}`,
-                }
-              : null,
-            ...trimmed,
-          ].filter(Boolean),
+          input: {
+            text,
+            voice_id: "Claire",
+            output_format: "mp3",
+            temperature: 1,
+            timestamp_type: "none",
+            speaking_rate: 1,
+          },
         }),
       },
       DEFAULT_TIMEOUT_MS,
@@ -92,7 +84,7 @@ exports.handler = async (event) => {
       try {
         data = JSON.parse(dataText);
       } catch (error) {
-        console.error("Failed to parse Cloudflare AI response:", error);
+        console.error("Failed to parse Cloudflare TTS response:", error);
       }
     }
 
@@ -101,26 +93,27 @@ exports.handler = async (event) => {
         data?.errors?.[0]?.message ||
         data?.error ||
         data?.message ||
-        "Cloudflare AI request failed";
-
+        "Cloudflare TTS request failed";
       return {
-        statusCode: aiRes.status || 502,
+        statusCode: 502,
         headers,
         body: JSON.stringify({ error: errorMessage, detail: data }),
       };
     }
 
-    const reply =
-      data?.result?.response ||
-      data?.result?.output_text ||
-      data?.result?.message?.content;
-
-    if (!reply) throw new Error("No reply returned from model");
+    const audioUrl = data?.result?.audio;
+    if (!audioUrl) {
+      return {
+        statusCode: 502,
+        headers,
+        body: JSON.stringify({ error: "No audio returned from Cloudflare TTS" }),
+      };
+    }
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ reply }),
+      body: JSON.stringify({ audioUrl }),
     };
   } catch (error) {
     if (error instanceof RequestAuthenticationError) {
@@ -132,13 +125,13 @@ exports.handler = async (event) => {
     }
 
     const isTimeout = error?.name === "AbortError";
-    console.error("Chat function error:", error);
+    console.error("TTS function error:", error);
     return {
       statusCode: isTimeout ? 504 : 500,
       headers,
       body: JSON.stringify({
         error: isTimeout
-          ? "Cloudflare AI request timed out. Please try again."
+          ? "Cloudflare TTS request timed out. Please try again."
           : error.message || "Unexpected error",
       }),
     };

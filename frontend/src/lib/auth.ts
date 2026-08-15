@@ -98,3 +98,12 @@ export function onAuthChange(callback: (user: User | null) => void): () => void 
     const unsubscribe = onAuthStateChanged(auth, callback);
     return unsubscribe;
 }
+
+export async function getFunctionAuthHeaders(): Promise<Record<string, string>> {
+  if (USE_LOCAL_AUTH) return {};
+
+  const { auth } = getFirebase();
+  const user = auth.currentUser as User;
+  const idToken = await user.getIdToken();
+  return { Authorization: `Bearer ${idToken}` };
+}

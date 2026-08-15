@@ -88,6 +88,9 @@ export default function App() {
     chatDraft,
     setChatDraft,
     sendChatMessage,
+    speechState,
+    playSpeech,
+    stopSpeech,
   } = useChatAssistant(functionsBase);
 
   const { timeString, temperatureLabel, weatherLabel } = useAmbientInfo();
@@ -510,6 +513,9 @@ export default function App() {
           chatDraft={chatDraft}
           setChatDraft={setChatDraft}
           sendChatMessage={sendChatMessage}
+          speechState={speechState}
+          playSpeech={playSpeech}
+          stopSpeech={stopSpeech}
           chatOpen={chatOpen}
           setChatOpen={setChatOpen}
         />
