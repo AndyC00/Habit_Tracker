@@ -1,0 +1,1 @@
+module.exports = require('./frontend/netlify/functions/tts.js')

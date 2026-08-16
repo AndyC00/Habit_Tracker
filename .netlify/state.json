@@ -1,0 +1,20 @@
+{
+	"geolocation": {
+		"data": {
+			"city": "Auckland",
+			"country": {
+				"code": "NZ",
+				"name": "New Zealand"
+			},
+			"subdivision": {
+				"code": "AUK",
+				"name": "Auckland"
+			},
+			"timezone": "Pacific/Auckland",
+			"latitude": -36.8504,
+			"longitude": 174.7675,
+			"postalCode": "1010"
+		},
+		"timestamp": 1786920171823
+	}
+}

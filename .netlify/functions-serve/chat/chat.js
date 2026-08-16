@@ -1,0 +1,1 @@
+module.exports = require('./frontend/netlify/functions/chat.js')
