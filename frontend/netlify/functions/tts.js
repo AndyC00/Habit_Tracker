@@ -88,11 +88,21 @@ export const handler = async (event) => {
       }
     }
 
+    const cloudflareResult = data?.result;
+    const cloudflareState = data?.state || cloudflareResult?.state;
+    const cloudflareError =
+      data?.errors?.[0]?.message ||
+      data?.error?.message ||
+      (typeof data?.error === "string" ? data.error : "") ||
+      data?.message ||
+      cloudflareResult?.errors?.[0]?.message ||
+      cloudflareResult?.error?.message ||
+      (typeof cloudflareResult?.error === "string" ? cloudflareResult.error : "") ||
+      cloudflareResult?.message;
+
     if (!aiRes.ok) {
       const errorMessage =
-        data?.errors?.[0]?.message ||
-        data?.error ||
-        data?.message ||
+        cloudflareError ||
         "Cloudflare TTS request failed";
       return {
         statusCode: 502,
@@ -101,12 +111,20 @@ export const handler = async (event) => {
       };
     }
 
-    const audioUrl = data?.result?.audio;
+    const audioUrl = cloudflareResult?.audio || cloudflareResult?.result?.audio;
     if (!audioUrl) {
+      console.error("Cloudflare TTS returned no audio:", {
+        state: cloudflareState,
+        error: cloudflareError,
+      });
       return {
         statusCode: 502,
         headers,
-        body: JSON.stringify({ error: "No audio returned from Cloudflare TTS" }),
+        body: JSON.stringify({
+          error:
+            cloudflareError ||
+            `Cloudflare TTS returned no audio${cloudflareState ? ` (${cloudflareState})` : ""}.`,
+        }),
       };
     }
 
