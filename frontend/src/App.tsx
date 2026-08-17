@@ -91,6 +91,10 @@ export default function App() {
     speechState,
     playSpeech,
     stopSpeech,
+    voiceInputState,
+    startVoiceInput,
+    finishVoiceInput,
+    cancelVoiceInput,
   } = useChatAssistant(functionsBase);
 
   const { timeString, temperatureLabel, weatherLabel } = useAmbientInfo();
@@ -516,6 +520,10 @@ export default function App() {
           speechState={speechState}
           playSpeech={playSpeech}
           stopSpeech={stopSpeech}
+          voiceInputState={voiceInputState}
+          startVoiceInput={startVoiceInput}
+          finishVoiceInput={finishVoiceInput}
+          cancelVoiceInput={cancelVoiceInput}
           chatOpen={chatOpen}
           setChatOpen={setChatOpen}
         />

@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import type { ChatMessage } from "../components/ChatWidget";
 import { getFunctionAuthHeaders } from "../lib/auth";
 import { useChatSpeech } from "./useChatSpeech";
+import { useChatVoiceInput } from "./useChatVoiceInput";
 
 export function useChatAssistant(functionsBase: string) {
   const [chatOpen, setChatOpen] = useState(false);
@@ -87,6 +88,16 @@ export function useChatAssistant(functionsBase: string) {
     [chatPending, functionsBase, playSpeech],
   );
 
+  const {
+    voiceInputState,
+    startVoiceInput,
+    finishVoiceInput,
+    cancelVoiceInput,
+  } = useChatVoiceInput({
+    disabled: chatPending,
+    onSubmit: sendChatMessage,
+  });
+
   return {
     chatOpen,
     setChatOpen,
@@ -99,5 +110,9 @@ export function useChatAssistant(functionsBase: string) {
     speechState,
     playSpeech,
     stopSpeech,
+    voiceInputState,
+    startVoiceInput,
+    finishVoiceInput,
+    cancelVoiceInput,
   };
 }

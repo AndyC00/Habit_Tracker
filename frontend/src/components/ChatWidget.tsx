@@ -1,6 +1,12 @@
-import { useState } from "react";
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import { Mic } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type {
+  CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+} from "react";
 import type { ChatSpeechState } from "../hooks/useChatSpeech";
+import type { ChatVoiceInputState } from "../hooks/useChatVoiceInput";
 import type { Habit, Stats } from "../lib/localStore";
 
 export type ChatMessage = {
@@ -35,6 +41,10 @@ type ChatWidgetProps = {
   speechState: ChatSpeechState;
   playSpeech: (messageIndex: number, text: string) => void;
   stopSpeech: () => void;
+  voiceInputState: ChatVoiceInputState;
+  startVoiceInput: () => void;
+  finishVoiceInput: () => void;
+  cancelVoiceInput: () => void;
   chatOpen: boolean;
   setChatOpen: (value: boolean) => void;
 };
@@ -62,6 +72,10 @@ export default function ChatWidget({
   speechState,
   playSpeech,
   stopSpeech,
+  voiceInputState,
+  startVoiceInput,
+  finishVoiceInput,
+  cancelVoiceInput,
   chatOpen,
   setChatOpen,
 }: ChatWidgetProps) {
@@ -70,7 +84,10 @@ export default function ChatWidget({
   const [hasPanelSize, setHasPanelSize] = useState(false);
   const [hasMinimumPanelSize, setHasMinimumPanelSize] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const quickHabits = habits.filter((h) => !h.isArchived && !h.isExample).slice(0, 4);
+  const voiceInputActive = voiceInputState.status !== "idle";
+  const interactionLocked = chatPending || voiceInputActive;
 
   const panelStyle: ChatPanelStyle = hasPanelSize
     ? {
@@ -140,6 +157,37 @@ export default function ChatWidget({
     resizeHandle.addEventListener("lostpointercapture", stopResize);
   };
 
+  const handleVoicePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    startVoiceInput();
+  };
+
+  const handleVoicePointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    finishVoiceInput();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const handleVoiceKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if ((event.key !== " " && event.key !== "Enter") || event.repeat) return;
+    event.preventDefault();
+    startVoiceInput();
+  };
+
+  const handleVoiceKeyUp = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== " " && event.key !== "Enter") return;
+    event.preventDefault();
+    finishVoiceInput();
+  };
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ block: "nearest" });
+  }, [chatError, chatMessages, voiceInputState.status, voiceInputState.transcript]);
+
   return (
     <div className={`chat-widget${isResizing ? " chat-widget--resizing" : ""}`}>
       {!chatOpen && (
@@ -169,6 +217,7 @@ export default function ChatWidget({
               className="chat-close"
               onClick={() => {
                 stopSpeech();
+                cancelVoiceInput();
                 setChatOpen(false);
               }}
             >
@@ -183,7 +232,7 @@ export default function ChatWidget({
                   key={h.id}
                   type="button"
                   className="btn chat-quick"
-                  disabled={chatPending}
+                  disabled={interactionLocked}
                   onClick={() => {
                     const stats = statsById[h.id];
                     const today = durationById[h.id];
@@ -258,6 +307,50 @@ export default function ChatWidget({
               </ul>
             )}
             {chatError && <p className="chat-error">{chatError}</p>}
+            {voiceInputActive && (
+              <div className="chat-bubble user chat-bubble--live">
+                <span className="chat-role">You</span>
+                <div>{voiceInputState.transcript || "Listening…"}</div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          <div className="chat-voice-control">
+            <button
+              type="button"
+              className={`chat-voice-button${voiceInputActive ? " is-active" : ""}`}
+              aria-label={voiceInputActive ? "Release to send voice message" : "Hold to talk"}
+              title={voiceInputState.supported ? "Hold to talk" : "Voice input is unavailable"}
+              disabled={
+                !voiceInputState.supported ||
+                chatPending ||
+                voiceInputState.status === "stopping"
+              }
+              onPointerDown={handleVoicePointerDown}
+              onPointerUp={handleVoicePointerUp}
+              onPointerCancel={cancelVoiceInput}
+              onKeyDown={handleVoiceKeyDown}
+              onKeyUp={handleVoiceKeyUp}
+              onContextMenu={(event) => event.preventDefault()}
+            >
+              <Mic aria-hidden="true" size={24} strokeWidth={2.4} />
+            </button>
+            <span className="chat-voice-label">
+              {voiceInputState.status === "listening"
+                ? "Listening… release to send"
+                : voiceInputState.status === "stopping"
+                  ? "Finishing…"
+                  : "Hold to talk"}
+            </span>
+            {!voiceInputState.supported && (
+              <span className="chat-voice-error">
+                Voice input is not supported in this browser.
+              </span>
+            )}
+            {voiceInputState.error && (
+              <span className="chat-voice-error">{voiceInputState.error}</span>
+            )}
           </div>
 
           <form
@@ -272,9 +365,9 @@ export default function ChatWidget({
               placeholder="Ask about your habits..."
               value={chatDraft}
               onChange={(e) => setChatDraft(e.target.value)}
-              disabled={chatPending}
+              disabled={interactionLocked}
             />
-            <button type="submit" className="btn primary" disabled={chatPending}>
+            <button type="submit" className="btn primary" disabled={interactionLocked}>
               {chatPending ? "Loading..." : "Send"}
             </button>
           </form>
