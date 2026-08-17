@@ -4,7 +4,13 @@ import { getFunctionAuthHeaders } from "../lib/auth";
 import { useChatSpeech } from "./useChatSpeech";
 import { useChatVoiceInput } from "./useChatVoiceInput";
 
-export function useChatAssistant(functionsBase: string) {
+function buildRequestContext(ambientContext: string, habitContext?: string) {
+  const environment = ambientContext.trim();
+  const habit = habitContext?.trim();
+  return habit ? `${environment}\n\nHabit information:\n${habit}` : environment;
+}
+
+export function useChatAssistant(functionsBase: string, ambientContext: string) {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatDraft, setChatDraft] = useState("");
@@ -21,6 +27,7 @@ export function useChatAssistant(functionsBase: string) {
 
       const userMessage: ChatMessage = { role: "user", content: text };
       const history = [...chatHistoryRef.current, userMessage];
+      const requestContext = buildRequestContext(ambientContext, habitContext);
       chatHistoryRef.current = history;
 
       setChatDraft("");
@@ -37,7 +44,7 @@ export function useChatAssistant(functionsBase: string) {
             "Content-Type": "application/json",
             ...authHeaders,
           },
-          body: JSON.stringify({ messages: history, habitContext }),
+          body: JSON.stringify({ messages: history, habitContext: requestContext }),
         });
 
         const raw = await res.text();
@@ -85,7 +92,7 @@ export function useChatAssistant(functionsBase: string) {
         setChatPending(false);
       }
     },
-    [chatPending, functionsBase, playSpeech],
+    [ambientContext, chatPending, functionsBase, playSpeech],
   );
 
   const {

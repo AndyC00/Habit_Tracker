@@ -79,6 +79,8 @@ export default function App() {
     createPaymentIntent,
   } = useDonationFlow();
 
+  const { timeString, temperatureLabel, weatherLabel, aiAmbientContext } = useAmbientInfo();
+
   const {
     chatOpen,
     setChatOpen,
@@ -95,9 +97,7 @@ export default function App() {
     startVoiceInput,
     finishVoiceInput,
     cancelVoiceInput,
-  } = useChatAssistant(functionsBase);
-
-  const { timeString, temperatureLabel, weatherLabel } = useAmbientInfo();
+  } = useChatAssistant(functionsBase, aiAmbientContext);
 
   const [formMode, setFormMode] = useState<FormMode | null>(null);
   const [formValues, setFormValues] = useState<HabitFormValues>(defaultFormValues);

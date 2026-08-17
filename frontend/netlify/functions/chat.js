@@ -71,12 +71,15 @@ export const handler = async (event) => {
             {
               role: "system",
               content:
-                "You are a concise, friendly assistant for a habit tracker app. Respond in plain text (no markdown or symbols like **). Keep evaluation short (<=3 sentences) and clear. Provide at most 3 numbered suggestions, each under 20 words.",
+                "You are a concise, friendly assistant for a habit tracker app. " +
+                "Providing useful advice based on the habit records and user's local environment info (location, weather and temperature) "+
+                "Respond in plain text (no markdown or symbols like **). " +
+                "Keep evaluation short (<=5 sentences) and clear. Provide at most 3 numbered suggestions, each under 40 words. " +
             },
             habitContext
               ? {
                   role: "system",
-                  content: `Habit context from user:\n${habitContext}`,
+                  content: `User context:\n${habitContext}`,
                 }
               : null,
             ...trimmed,

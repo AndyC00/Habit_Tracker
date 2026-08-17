@@ -5,6 +5,7 @@ export type TempStatus = "idle" | "loading" | "error" | "unsupported";
 
 export function useAmbientInfo() {
   const [now, setNow] = useState<Date>(new Date());
+  const [localTimeZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [localTempC, setLocalTempC] = useState<number | null>(null);
   const [localWeather, setLocalWeather] = useState<string | null>(null);
   const [tempStatus, setTempStatus] = useState<TempStatus>("loading");
@@ -22,6 +23,7 @@ export function useAmbientInfo() {
 
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setTempStatus("unsupported");
+      setLocalTempC(null);
       setLocalWeather(null);
       return;
     }
@@ -53,6 +55,7 @@ export function useAmbientInfo() {
         }
       } catch (e) {
         if (!cancelled) {
+          setLocalTempC(null);
           setLocalWeather(null);
           setTempStatus("error");
         }
@@ -72,6 +75,7 @@ export function useAmbientInfo() {
         },
         () => {
           if (!cancelled) {
+            setLocalTempC(null);
             setLocalWeather(null);
             setTempStatus("error");
           }
@@ -91,11 +95,19 @@ export function useAmbientInfo() {
         geoPermission = perm;
         if (perm.state === "granted" || perm.state === "prompt") {
           requestTemperature(true);
+        } else {
+          setLocalTempC(null);
+          setLocalWeather(null);
+          setTempStatus("error");
         }
         perm.onchange = () => {
           if (cancelled) return;
           if (perm.state === "granted") {
             requestTemperature(true);
+          } else if (perm.state === "denied") {
+            setLocalTempC(null);
+            setLocalWeather(null);
+            setTempStatus("error");
           }
         };
       } catch {
@@ -133,9 +145,9 @@ export function useAmbientInfo() {
         second: "2-digit",
         hour12: false,
         timeZoneName: "short",
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timeZone: localTimeZone,
       }).format(now),
-    [now],
+    [localTimeZone, now],
   );
 
   const temperatureLabel = useMemo(() => {
@@ -155,13 +167,22 @@ export function useAmbientInfo() {
     return "Loading local weather...";
   }, [localWeather, tempStatus]);
 
+  const aiAmbientContext = useMemo(() => {
+    const lines = ["Local environment:", `Location time zone: ${localTimeZone}`];
+    if (localWeather) lines.push(`Weather: ${localWeather}`);
+    if (localTempC !== null) lines.push(`Temperature: ${localTempC}\u00b0C`);
+    return lines.join("\n");
+  }, [localTempC, localTimeZone, localWeather]);
+
   return {
     now,
     timeString,
+    localTimeZone,
     localTempC,
     localWeather,
     tempStatus,
     temperatureLabel,
     weatherLabel,
+    aiAmbientContext,
   };
 }
