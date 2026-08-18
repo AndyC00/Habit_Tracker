@@ -26,6 +26,10 @@ function emptyYearSeries(year: number): Point[] {
   }));
 }
 
+function xPosition(index: number, pointCount: number, width: number) {
+  return pointCount === 1 ? width / 2 : (index / (pointCount - 1)) * width;
+}
+
 // ------------------ Week Chart (SVG) ------------------
 export function WeekChart({ habitId }: { habitId: number }) {
   const [points, setPoints] = useState<Point[] | null>(null);
@@ -40,7 +44,8 @@ export function WeekChart({ habitId }: { habitId: number }) {
           setPoints(toCumulative(EXAMPLE_WEEK_SERIES));
           return;
         }
-        const series = await store.getRecentSeries(habitId, 7);
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const series = await store.getRecentSeries(habitId, 7, timeZone);
         setPoints(toCumulative(series));
       } catch (e: any) {
         setErr(e.message ?? "Failed to load week series");
@@ -50,6 +55,7 @@ export function WeekChart({ habitId }: { habitId: number }) {
 
   if (err) return <div className="error">{err}</div>;
   if (!points) return <div className="loading">Loading...</div>;
+  if (points.length === 0) return <div className="chart chart-year-empty">No check-ins yet.</div>;
 
   // Y-axis 0..max cumulative value
   const values = points.map((p) => p.minutes);
@@ -64,7 +70,7 @@ export function WeekChart({ habitId }: { habitId: number }) {
   const iw = width - margin.left - margin.right;
   const ih = height - margin.top - margin.bottom;
 
-  const xScale = (i: number) => (i / (points.length - 1)) * iw;
+  const xScale = (i: number) => xPosition(i, points.length, iw);
   const yScale = (v: number) => {
     if (yMax === yMin) return ih / 2;
     const t = (v - yMin) / (yMax - yMin);
@@ -156,7 +162,8 @@ export function MonthChart({ habitId }: { habitId: number }) {
           setPoints(toCumulative(EXAMPLE_MONTH_SERIES));
           return;
         }
-        const series = await store.getMonthSeries(habitId);
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const series = await store.getMonthSeries(habitId, timeZone);
         setPoints(toCumulative(series));
       } catch (e: any) {
         setErr(e.message ?? "Failed to load month series");
@@ -166,6 +173,7 @@ export function MonthChart({ habitId }: { habitId: number }) {
 
   if (err) return <div className="error">{err}</div>;
   if (!points) return <div className="loading">Loading...</div>;
+  if (points.length === 0) return <div className="chart chart-year-empty">No check-ins yet.</div>;
 
   const values = points.map((p) => p.minutes);
   const vmax = Math.max(...values);
@@ -179,7 +187,7 @@ export function MonthChart({ habitId }: { habitId: number }) {
   const iw = width - margin.left - margin.right;
   const ih = height - margin.top - margin.bottom;
 
-  const xScale = (i: number) => (i / (points.length - 1)) * iw;
+  const xScale = (i: number) => xPosition(i, points.length, iw);
   const yScale = (v: number) => {
     if (yMax === yMin) return ih / 2;
     const t = (v - yMin) / (yMax - yMin);
@@ -276,16 +284,15 @@ export function TotalChart({ habitId }: { habitId: number }) {
           setSelectedYear(exampleYears[0]);
           return;
         }
-        const availableYears = await store.getTotalYears(habitId);
-        const fallbackYear = new Date().getFullYear();
-        const yearsToUse = availableYears.length ? availableYears : [fallbackYear];
-        setYears(yearsToUse);
-        setSelectedYear(yearsToUse[0]);
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const availableYears = await store.getTotalYears(habitId, timeZone);
+        setYears(availableYears);
+        setSelectedYear(availableYears[0] ?? null);
+        if (availableYears.length === 0) setPoints([]);
       } catch (e: any) {
         setErr(e.message ?? "Failed to load total series");
-        const fallbackYear = new Date().getFullYear();
-        setYears([fallbackYear]);
-        setSelectedYear(fallbackYear);
+        setYears([]);
+        setSelectedYear(null);
       }
     })();
   }, [habitId, isExample]);
@@ -301,9 +308,10 @@ export function TotalChart({ habitId }: { habitId: number }) {
         if (isExample) {
           series = EXAMPLE_TOTAL_SERIES_BY_YEAR[year] ?? [];
         } else {
-          series = await store.getTotalSeries(habitId, year);
+          const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          series = await store.getTotalSeries(habitId, year, timeZone);
         }
-        if (!series.length) {
+        if (!series.length && isExample) {
           series = emptyYearSeries(year);
         }
         setPoints(toCumulative(series));
@@ -318,6 +326,7 @@ export function TotalChart({ habitId }: { habitId: number }) {
 
   if (err) return <div className="error">{err}</div>;
   if (points === null) return <div className="loading">Loading...</div>;
+  if (points.length === 0) return <div className="chart chart-year-empty">No check-ins yet.</div>;
 
   const values = points.map((p) => p.minutes);
   const vmax = Math.max(...values);
@@ -331,7 +340,7 @@ export function TotalChart({ habitId }: { habitId: number }) {
   const iw = width - margin.left - margin.right;
   const ih = height - margin.top - margin.bottom;
 
-  const xScale = (i: number) => (i / (points.length - 1)) * iw;
+  const xScale = (i: number) => xPosition(i, points.length, iw);
   const yScale = (v: number) => {
     if (yMax === yMin) return ih / 2;
     const t = (v - yMin) / (yMax - yMin);

@@ -150,6 +150,19 @@ export function useAmbientInfo() {
     [localTimeZone, now],
   );
 
+  const localDate = useMemo(() => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: localTimeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(now);
+    const year = parts.find((part) => part.type === "year")!.value;
+    const month = parts.find((part) => part.type === "month")!.value;
+    const day = parts.find((part) => part.type === "day")!.value;
+    return `${year}-${month}-${day}`;
+  }, [localTimeZone, now]);
+
   const temperatureLabel = useMemo(() => {
     if (localTempC !== null) {
       return `Local ${Math.round(localTempC)}\u00b0C`;
@@ -176,6 +189,7 @@ export function useAmbientInfo() {
 
   return {
     now,
+    localDate,
     timeString,
     localTimeZone,
     localTempC,

@@ -4,12 +4,13 @@ import { requestAiReply } from "../lib/chatApi";
 import {
   buildHabitAnalysisContext,
   buildHabitAnalysisSourceSignature,
+  buildHabitAnalysisTimeline,
 } from "../lib/habitAiContext";
 import type { Habit, Stats } from "../lib/localStore";
 import { getHabitCheckInHistory } from "../lib/localStore";
 
 const ANALYSIS_STORAGE_PREFIX = "habittracker:habit-analysis:";
-const MAX_HISTORY_RECORDS = 100;
+const MAX_ANALYSIS_DAYS = 100;
 
 export type HabitAnalysisState = {
   status: "loading" | "success" | "error";
@@ -31,6 +32,7 @@ type PersistedHabitAnalysisMap = Record<string, PersistedHabitAnalysis>;
 type UseHabitAnalysisOptions = {
   functionsBase: string;
   ambientContext: string;
+  analysisDate: string;
   habits: Habit[];
   statsById: Record<number, Stats | undefined>;
   ready: boolean;
@@ -59,6 +61,7 @@ function getErrorMessage(error: unknown) {
 export function useHabitAnalysis({
   functionsBase,
   ambientContext,
+  analysisDate,
   habits,
   statsById,
   ready,
@@ -73,11 +76,15 @@ export function useHabitAnalysis({
     for (const habit of habits) {
       const stats = statsById[habit.id];
       if (!habit.isExample && stats) {
-        signatures[habit.id] = buildHabitAnalysisSourceSignature(habit, stats);
+        signatures[habit.id] = buildHabitAnalysisSourceSignature(
+          habit,
+          stats,
+          analysisDate,
+        );
       }
     }
     return signatures;
-  }, [habits, statsById]);
+  }, [analysisDate, habits, statsById]);
   const sourceSignaturesRef = useRef(sourceSignatures);
   sourceSignaturesRef.current = sourceSignatures;
 
@@ -152,9 +159,13 @@ export function useHabitAnalysis({
     async (habit: Habit) => {
       if (habit.isExample) return;
       const stats = statsById[habit.id];
-      if (!stats) return;
+      if (!stats?.startedOn) return;
 
-      const sourceSignature = buildHabitAnalysisSourceSignature(habit, stats);
+      const sourceSignature = buildHabitAnalysisSourceSignature(
+        habit,
+        stats,
+        analysisDate,
+      );
       const requestId = (requestIdsRef.current[habit.id] ?? 0) + 1;
       requestIdsRef.current[habit.id] = requestId;
 
@@ -175,17 +186,18 @@ export function useHabitAnalysis({
 
       try {
         const history = await getHabitCheckInHistory(habit.id);
-        const validHistory = history.filter(
-          (entry): entry is typeof entry & { durationMinutes: number } =>
-            typeof entry.durationMinutes === "number",
+        const timeline = buildHabitAnalysisTimeline(
+          history,
+          stats.startedOn,
+          analysisDate,
+          MAX_ANALYSIS_DAYS,
         );
-        const recentHistory = validHistory.slice(-MAX_HISTORY_RECORDS);
         const habitContext = buildHabitAnalysisContext({
           ambientContext,
+          analysisDate,
           habit,
           stats,
-          history: recentHistory,
-          validHistoryCount: validHistory.length,
+          timeline,
         });
         const content = await requestAiReply(functionsBase, {
           requestType: "habit-analysis",
@@ -246,7 +258,7 @@ export function useHabitAnalysis({
         });
       }
     },
-    [ambientContext, functionsBase, statsById],
+    [ambientContext, analysisDate, functionsBase, statsById],
   );
 
   const visibleAnalysisByHabitId = useMemo(() => {

@@ -20,6 +20,7 @@ import * as reminders from "./lib/reminderApi";
 import { DonationDialog } from "./components/DonationDialog";
 import { HabitFormModal, type HabitFormMode, type HabitFormValues } from "./components/HabitFormModal";
 import { ArchivedHabitsModal } from "./components/ArchivedHabitsModal";
+import { formatLocalISODate } from "./lib/localDate";
 
 type FormMode = HabitFormMode | { type: "archived" };
 
@@ -81,7 +82,13 @@ export default function App() {
     createPaymentIntent,
   } = useDonationFlow();
 
-  const { timeString, temperatureLabel, weatherLabel, aiAmbientContext } = useAmbientInfo();
+  const {
+    localDate,
+    timeString,
+    temperatureLabel,
+    weatherLabel,
+    aiAmbientContext,
+  } = useAmbientInfo();
 
   const {
     chatOpen,
@@ -104,6 +111,7 @@ export default function App() {
   const { analysisByHabitId, analyseHabit } = useHabitAnalysis({
     functionsBase,
     ambientContext: aiAmbientContext,
+    analysisDate: localDate,
     habits,
     statsById,
     ready: !loading,
@@ -384,6 +392,11 @@ export default function App() {
                   )}
 
                   <div className="habit-stats">
+                    <p>
+                      Started: {stats?.startedOn
+                        ? formatLocalISODate(stats.startedOn)
+                        : "Not started"}
+                    </p>
                     <p>Completed (total): {stats?.completedTotal ?? 0} days</p>
                     <p>Longest streak: {stats?.longestStreak ?? 0}</p>
                     <p>Total minutes: {stats?.totalDurationMinutes ?? 0}</p>
@@ -483,7 +496,9 @@ export default function App() {
                     type="button"
                     className="btn habit-analysis-button"
                     disabled={
-                      isExampleHabit || !stats || analysis?.status === "loading"
+                      isExampleHabit ||
+                      !stats?.startedOn ||
+                      analysis?.status === "loading"
                     }
                     onClick={() => {
                       void analyseHabit(h);
@@ -491,6 +506,8 @@ export default function App() {
                     title={
                       isExampleHabit
                         ? "Example habit cannot be analysed"
+                        : !stats?.startedOn
+                          ? "Check in at least once before analysing this habit"
                         : "Analyse this habit with AI"
                     }
                   >

@@ -30,6 +30,7 @@ export type HabitCheckInHistoryEntry = {
 };
 
 export type Stats = {
+  startedOn: string | null;
   completedThisMonth: number;
   completedTotal: number;
   longestStreak: number;
@@ -340,8 +341,10 @@ export async function getStats(
     const todayRec = checks.find((c) => c.localDate === todayIso);
     const hasTodayCheckIn = !!todayRec;
     const todayDurationMinutes = todayRec?.durationMinutes ?? null;
+    const startedOn = checks.length > 0 ? checks[0].localDate : null;
 
     return {
+      startedOn,
       completedThisMonth,
       completedTotal,
       longestStreak: longest,
@@ -392,8 +395,9 @@ export async function getStats(
     const todayRec = checks.find((c) => c.localDate === todayIso);
     const hasTodayCheckIn = !!todayRec;
     const todayDurationMinutes = todayRec?.durationMinutes ?? null;
+    const startedOn = checks.length > 0 ? checks[0].localDate : null;
 
-    return { completedThisMonth, completedTotal, longestStreak: longest, totalDurationMinutes, durationThisMonth, hasTodayCheckIn, todayDurationMinutes };
+    return { startedOn, completedThisMonth, completedTotal, longestStreak: longest, totalDurationMinutes, durationThisMonth, hasTodayCheckIn, todayDurationMinutes };
   }
 }
 
@@ -480,15 +484,17 @@ export async function getRecentSeries(
       .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
   }
 
-  const latest = sorted.length > 0 ? sorted[sorted.length - 1].date : todayInTZISO(tz);
-  const start = addDaysISO(latest, -(days - 1));
+  if (sorted.length === 0) return [];
+
+  const today = todayInTZISO(tz);
+  const windowStart = addDaysISO(today, -(days - 1));
+  const start = sorted[0].date > windowStart ? sorted[0].date : windowStart;
 
   const map = new Map<string, number>();
   for (const p of sorted) map.set(p.date, p.minutes ?? 0);
 
   const result: { date: string; minutes: number }[] = [];
-  for (let i = 0; i < days; i++) {
-    const d = addDaysISO(start, i);
+  for (let d = start; d <= today; d = addDaysISO(d, 1)) {
     const v = map.get(d);
     result.push({ date: d, minutes: v ?? 0 });
   }
@@ -519,24 +525,18 @@ export async function getMonthSeries(
       .sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
       .map((c) => ({ date: c.localDate, minutes: c.durationMinutes ?? 0 }));
   }
-  const latest = all.length > 0 ? all[all.length - 1].date : todayInTZISO(tz);
-  const y = Number(latest.slice(0, 4));
-  const m = Number(latest.slice(5, 7));
-  const monthKey = latest.slice(0, 7);
-  const start = `${monthKey}-01`;
-  const daysInMonth = new Date(y, m, 0).getDate();
+  if (all.length === 0) return [];
+
+  const today = todayInTZISO(tz);
+  const monthKey = today.slice(0, 7);
+  const monthStart = `${monthKey}-01`;
+  const start = all[0].date > monthStart ? all[0].date : monthStart;
 
   const map = new Map<string, number>();
   for (const c of all) if (c.date.startsWith(monthKey)) map.set(c.date, c.minutes ?? 0);
 
   const result: { date: string; minutes: number }[] = [];
-  // Only include days that have "arrived". If this month is the current month (in tz),
-  // cut off at today; otherwise include full month.
-  const today = todayInTZISO(tz);
-  const isCurrentMonth = today.slice(0, 7) === monthKey;
-  const endDay = isCurrentMonth ? Number(today.slice(8, 10)) : daysInMonth;
-  for (let i = 0; i < endDay; i++) {
-    const d = addDaysISO(start, i);
+  for (let d = start; d <= today; d = addDaysISO(d, 1)) {
     const v = map.get(d);
     result.push({ date: d, minutes: v ?? 0 });
   }
@@ -550,32 +550,42 @@ export async function getTotalSeries(
   tz?: string,
 ): Promise<{ date: string; minutes: number }[]> {
   const checks = await getAllChecksSorted(habitId);
+  if (checks.length === 0) return [];
 
   const today = todayInTZISO(tz);
-  const targetYear = String(year ?? Number(today.slice(0, 4)));
-  const filtered = checks.filter((c) => c.date.slice(0, 4) === targetYear);
+  const startYear = Number(checks[0].date.slice(0, 4));
+  const currentYear = Number(today.slice(0, 4));
+  const targetYearNumber = year ?? currentYear;
+  if (targetYearNumber < startYear || targetYearNumber > currentYear) return [];
 
-  const monthlyTotals = Array(12).fill(0);
+  const targetYear = String(targetYearNumber);
+  const filtered = checks.filter((c) => c.date.slice(0, 4) === targetYear);
+  const startMonth = targetYearNumber === startYear ? Number(checks[0].date.slice(5, 7)) : 1;
+  const endMonth = targetYearNumber === currentYear ? Number(today.slice(5, 7)) : 12;
+  const monthlyTotals = Array(endMonth - startMonth + 1).fill(0);
   for (const rec of filtered) {
-    const monthIndex = Number(rec.date.slice(5, 7)) - 1;
-    if (monthIndex >= 0 && monthIndex < 12) {
+    const monthIndex = Number(rec.date.slice(5, 7)) - startMonth;
+    if (monthIndex >= 0 && monthIndex < monthlyTotals.length) {
       monthlyTotals[monthIndex] += rec.minutes ?? 0;
     }
   }
 
   return monthlyTotals.map((total, idx) => {
-    const month = String(idx + 1).padStart(2, "0");
+    const month = String(startMonth + idx).padStart(2, "0");
     return { date: `${targetYear}-${month}-01`, minutes: total };
-  }); // Jan -> Dec monthly totals (non-cumulative) for selected year; empty data yields zeros
+  });
 }
 
-export async function getTotalYears(habitId: number): Promise<number[]> {
+export async function getTotalYears(habitId: number, tz?: string): Promise<number[]> {
   const checks = await getAllChecksSorted(habitId);
-  const years = new Set<number>();
-  for (const c of checks) {
-    years.add(Number(c.date.slice(0, 4)));
-  }
-  return Array.from(years).sort((a, b) => b - a);
+  if (checks.length === 0) return [];
+
+  const startYear = Number(checks[0].date.slice(0, 4));
+  const currentYear = Number(todayInTZISO(tz).slice(0, 4));
+  return Array.from(
+    { length: currentYear - startYear + 1 },
+    (_, index) => currentYear - index,
+  );
 }
 
 // ---------- export/import for backup (local only) ----------

@@ -1,4 +1,5 @@
 import { getIconByKey } from "../lib/habitIcons";
+import { formatLocalISODate } from "../lib/localDate";
 import type { Habit, Stats } from "../lib/localStore";
 
 type ArchivedHabitsModalProps = {
@@ -40,6 +41,11 @@ export function ArchivedHabitsModal({ habits, statsById, onClose, error }: Archi
                         </div>
                       )}
                       <div className="habit-stats">
+                        <p>
+                          Started: {stats?.startedOn
+                            ? formatLocalISODate(stats.startedOn)
+                            : "Not started"}
+                        </p>
                         <p>Completed (total): {stats?.completedTotal ?? 0} days</p>
                         <p>Longest streak: {stats?.longestStreak ?? 0}</p>
                         <p>Total minutes: {stats?.totalDurationMinutes ?? 0}</p>
