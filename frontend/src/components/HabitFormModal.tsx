@@ -46,7 +46,7 @@ export function HabitFormModal({
 }: HabitFormModalProps) {
   return (
     <div className="habit-form-backdrop" role="presentation">
-      <form className="habit-form" onSubmit={onSubmit}>
+      <form className="habit-form habit-details-form" onSubmit={onSubmit}>
         <h2>{mode.type === "create" ? "Create Habit" : "Edit Habit"}</h2>
 
         <label>

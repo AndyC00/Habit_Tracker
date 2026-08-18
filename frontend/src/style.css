@@ -499,6 +499,13 @@ label {
   box-shadow: 0 24px 60px rgba(8, 15, 35, 0.55);
 }
 
+.habit-details-form {
+  max-height: calc(100vh - 36px);
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .habit-form-archived {
   width: 82vw;
   height: 78vh;
