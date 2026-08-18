@@ -10,6 +10,13 @@ import {
 
 const MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
 const DEFAULT_TIMEOUT_MS = Number(process.env.CF_AI_TIMEOUT_MS || 25000);
+const CHAT_SYSTEM_PROMPT =
+  "You are a concise, friendly assistant for a habit tracker app. " +
+  "Providing useful advice based on the habit records and user's local environment info (location, weather and temperature) " +
+  "Respond in plain text (no markdown or symbols like **). " +
+  "Keep evaluation short (<=5 sentences) and clear. Provide at most 3 numbered suggestions, each under 40 words. ";
+const HABIT_ANALYSIS_SYSTEM_PROMPT =
+  "You are a habit analysis assistant. Analyse the supplied habit and check-in context. Return a useful plain-text analysis.";
 
 export const handler = async (event) => {
   const headers = {
@@ -34,6 +41,14 @@ export const handler = async (event) => {
     await requireFirebaseUser(event);
 
     const body = JSON.parse(event.body || "{}");
+    const requestType = body.requestType ?? "chat";
+    if (requestType !== "chat" && requestType !== "habit-analysis") {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: "Invalid request type" }),
+      };
+    }
     const messages = Array.isArray(body.messages) ? body.messages : [];
     const habitContext =
       typeof body.habitContext === "string" ? body.habitContext.trim() : "";
@@ -71,10 +86,9 @@ export const handler = async (event) => {
             {
               role: "system",
               content:
-                "You are a concise, friendly assistant for a habit tracker app. " +
-                "Providing useful advice based on the habit records and user's local environment info (location, weather and temperature) "+
-                "Respond in plain text (no markdown or symbols like **). " +
-                "Keep evaluation short (<=5 sentences) and clear. Provide at most 3 numbered suggestions, each under 40 words. "
+                requestType === "habit-analysis"
+                  ? HABIT_ANALYSIS_SYSTEM_PROMPT
+                  : CHAT_SYSTEM_PROMPT,
             },
             habitContext
               ? {

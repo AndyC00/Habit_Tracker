@@ -99,6 +99,19 @@ export function onAuthChange(callback: (user: User | null) => void): () => void 
     return unsubscribe;
 }
 
+export function getCurrentUserId(): string {
+  if (USE_LOCAL_AUTH) {
+    const state = readLocalAuth();
+    if (!state) throw new Error("Not authenticated");
+    return state.uid;
+  }
+
+  const { auth } = getFirebase();
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  return user.uid;
+}
+
 export async function getFunctionAuthHeaders(): Promise<Record<string, string>> {
   if (USE_LOCAL_AUTH) return {};
 

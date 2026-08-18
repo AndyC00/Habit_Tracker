@@ -23,6 +23,11 @@ export type CheckIn = {
   createdUtc?: string;
 };
 
+export type HabitCheckInHistoryEntry = {
+  localDate: string;
+  durationMinutes: number | null;
+};
+
 export type Stats = {
   completedThisMonth: number;
   completedTotal: number;
@@ -383,6 +388,41 @@ export async function getStats(
 
     return { completedThisMonth, completedTotal, longestStreak: longest, totalDurationMinutes, durationThisMonth, hasTodayCheckIn, todayDurationMinutes };
   }
+}
+
+export async function getHabitCheckInHistory(
+  habitId: number,
+): Promise<HabitCheckInHistoryEntry[]> {
+  if (USE_LOCAL_STORAGE) {
+    const db = loadDB();
+    return db.checkins
+      .filter((checkIn) => checkIn.habitId === habitId)
+      .sort((a, b) =>
+        a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0,
+      )
+      .map((checkIn) => ({
+        localDate: checkIn.localDate,
+        durationMinutes: checkIn.durationMinutes ?? null,
+      }));
+  }
+
+  await authReady;
+  const { db } = getFirebase();
+  const uid = getUid();
+  const historyQuery = query(
+    collection(db, "users", uid, "checkins"),
+    where("habitId", "==", habitId),
+  );
+  const snapshot = await getDocs(historyQuery);
+  return snapshot.docs
+    .map((entry) => entry.data() as CheckIn)
+    .sort((a, b) =>
+      a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0,
+    )
+    .map((checkIn) => ({
+      localDate: checkIn.localDate,
+      durationMinutes: checkIn.durationMinutes ?? null,
+    }));
 }
 
 // ---------- Series (for charts) ----------

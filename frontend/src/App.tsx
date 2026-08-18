@@ -12,6 +12,7 @@ import { useAmbientInfo } from "./hooks/useAmbientInfo";
 import { useChatAssistant } from "./hooks/useChatAssistant";
 import { useDonationFlow } from "./hooks/useDonationFlow";
 import { useHabitsData } from "./hooks/useHabitsData";
+import { useHabitAnalysis } from "./hooks/useHabitAnalysis";
 import { COLOR_OPTIONS } from "./lib/habitColors";
 import { ICON_OPTIONS, getIconByKey } from "./lib/habitIcons";
 import { functionsBase } from "./lib/env";
@@ -98,6 +99,14 @@ export default function App() {
     finishVoiceInput,
     cancelVoiceInput,
   } = useChatAssistant(functionsBase, aiAmbientContext);
+
+  const { analysisByHabitId, analyseHabit } = useHabitAnalysis({
+    functionsBase,
+    ambientContext: aiAmbientContext,
+    habits,
+    statsById,
+    ready: !loading,
+  });
 
   const [formMode, setFormMode] = useState<FormMode | null>(null);
   const [formValues, setFormValues] = useState<HabitFormValues>(defaultFormValues);
@@ -350,6 +359,7 @@ export default function App() {
             const dur = durationById[h.id] ?? "";
             const bg = h.colorHex ?? "#1e1e1e";
             const isExampleHabit = !!h.isExample;
+            const analysis = analysisByHabitId[h.id];
 
             return (
               <li key={h.id} className="habit-item" style={{ ["--bg" as any]: bg }}>
@@ -459,6 +469,49 @@ export default function App() {
                       Total Statistic
                     </button>
                   </div>
+                </div>
+                <div className="habit-analysis">
+                  <button
+                    type="button"
+                    className="btn habit-analysis-button"
+                    disabled={
+                      isExampleHabit || !stats || analysis?.status === "loading"
+                    }
+                    onClick={() => {
+                      void analyseHabit(h);
+                    }}
+                    title={
+                      isExampleHabit
+                        ? "Example habit cannot be analysed"
+                        : "Analyse this habit with AI"
+                    }
+                  >
+                    {analysis?.status === "loading" ? "Analysing..." : "Analyse"}
+                  </button>
+
+                  {analysis && (
+                    <div className="habit-analysis-panel" aria-live="polite">
+                      {analysis.status === "loading" && (
+                        <div className="habit-analysis-status">Analysing habit data...</div>
+                      )}
+                      {analysis.content && (
+                        <div className="habit-analysis-output">{analysis.content}</div>
+                      )}
+                      {analysis.analyzedAt && (
+                        <div className="habit-analysis-meta">
+                          Analysed {new Date(analysis.analyzedAt).toLocaleString()}
+                        </div>
+                      )}
+                      {analysis.error && (
+                        <div className="habit-analysis-error">{analysis.error}</div>
+                      )}
+                      {analysis.saveWarning && (
+                        <div className="habit-analysis-warning">
+                          {analysis.saveWarning}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {openChart?.habitId === h.id && (
                   <div

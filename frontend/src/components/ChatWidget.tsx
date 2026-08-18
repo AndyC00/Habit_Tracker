@@ -7,26 +7,13 @@ import type {
 } from "react";
 import type { ChatSpeechState } from "../hooks/useChatSpeech";
 import type { ChatVoiceInputState } from "../hooks/useChatVoiceInput";
+import { buildHabitContext } from "../lib/habitAiContext";
 import type { Habit, Stats } from "../lib/localStore";
 
 export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
 };
-
-function buildHabitContext(habit: Habit, stats?: Stats, todayMinutes?: number | "" | undefined) {
-  const lines = [
-    `Name: ${habit.name}`,
-    habit.description ? `Description: ${habit.description}` : null,
-    habit.isArchived ? "Archived: yes" : "Archived: no",
-    stats ? `Completed total: ${stats.completedTotal}` : null,
-    stats ? `Longest streak: ${stats.longestStreak}` : null,
-    stats ? `Total minutes: ${stats.totalDurationMinutes}` : null,
-    stats ? `Minutes this month: ${stats.durationThisMonth}` : null,
-    typeof todayMinutes === "number" ? `Today minutes: ${todayMinutes}` : null,
-  ].filter(Boolean);
-  return lines.join("\n");
-}
 
 type ChatWidgetProps = {
   habits: Habit[];

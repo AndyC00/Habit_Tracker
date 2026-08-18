@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { ChatMessage } from "../components/ChatWidget";
-import { getFunctionAuthHeaders } from "../lib/auth";
+import { requestAiReply } from "../lib/chatApi";
 import { useChatSpeech } from "./useChatSpeech";
 import { useChatVoiceInput } from "./useChatVoiceInput";
 
@@ -37,47 +37,15 @@ export function useChatAssistant(functionsBase: string, ambientContext: string) 
       setChatOpen(true);
 
       try {
-        const authHeaders = await getFunctionAuthHeaders();
-        const res = await fetch(`${functionsBase}/.netlify/functions/chat`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...authHeaders,
-          },
-          body: JSON.stringify({ messages: history, habitContext: requestContext }),
+        const reply = await requestAiReply(functionsBase, {
+          requestType: "chat",
+          messages: history,
+          habitContext: requestContext,
         });
-
-        const raw = await res.text();
-        let data: any = null;
-        let parseError: Error | null = null;
-        if (raw) {
-          try {
-            data = JSON.parse(raw);
-          } catch (err: any) {
-            parseError = err;
-          }
-        }
-
-        if (!res.ok) {
-          const detail = typeof data === "object" ? JSON.stringify(data) : "";
-          if (res.status === 404) {
-            throw new Error("Chat function not found (404). Are Netlify functions running? Try `netlify dev`.");
-          }
-          throw new Error(data?.error || `Chat request failed (${res.status}) ${detail}`);
-        }
-
-        if (parseError) {
-          throw new Error(`Invalid chat response: ${parseError.message || "parse error"}`);
-        }
-
-        const reply = data?.reply;
-        if (!reply) {
-          throw new Error("No reply from assistant.");
-        }
 
         const assistantMessage: ChatMessage = {
           role: "assistant",
-          content: typeof reply === "string" ? reply : String(reply),
+          content: reply,
         };
 
         setChatMessages((prev): ChatMessage[] => {
