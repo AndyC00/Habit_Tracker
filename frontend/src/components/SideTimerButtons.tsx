@@ -56,6 +56,7 @@ function buildPomodoroPhases(): PomodoroPhase[] {
 }
 
 export default function SideTimerButtons() {
+  const [isVisible, setIsVisible] = useState(true);
   const [active, setActive] = useState<ActiveTimer | null>(null);
   const [remainingMs, setRemainingMs] = useState(0);
   const [lastFinished, setLastFinished] = useState<string | null>(null);
@@ -155,6 +156,11 @@ export default function SideTimerButtons() {
     setPomodoro(null);
   }
 
+  function closeTimerRail() {
+    stopActive();
+    setIsVisible(false);
+  }
+
   useEffect(() => {
     if (!active) return;
 
@@ -187,9 +193,22 @@ export default function SideTimerButtons() {
 
   useEffect(() => () => clearTimers(), []);
 
+  if (!isVisible) return null;
+
   return (
     <div className="timer-rail">
-      <div className="timer-rail-title">Quick timers</div>
+      <div className="timer-rail-header">
+        <div className="timer-rail-title">Quick timers</div>
+        <button
+          type="button"
+          className="timer-rail-close"
+          aria-label="Close quick timers"
+          title="Close quick timers until the page is refreshed"
+          onClick={closeTimerRail}
+        >
+          ×
+        </button>
+      </div>
       <div className="timer-rail-buttons">
         {PRESETS.map((preset) => (
           <button
