@@ -29,6 +29,7 @@ const DEFAULT_TZ =
 const defaultFormValues: HabitFormValues = {
   name: "",
   description: "",
+  expectedPerformance: "",
   colorHex: "",
   iconKey: "",
   isArchived: false,
@@ -158,6 +159,7 @@ export default function App() {
     setFormValues({
       name: habit.name,
       description: habit.description ?? "",
+      expectedPerformance: habit.expectedPerformance ?? "",
       colorHex: habit.colorHex ?? "",
       iconKey: habit.iconKey ?? "",
       isArchived: habit.isArchived,
@@ -225,6 +227,7 @@ export default function App() {
       const payload = {
         name: formValues.name.trim(),
         description: normalizeOptional(formValues.description),
+        expectedPerformance: normalizeOptional(formValues.expectedPerformance),
         colorHex: normalizeOptional(formValues.colorHex),
         iconKey: normalizeOptional(formValues.iconKey),
       };
@@ -374,6 +377,11 @@ export default function App() {
                     {h.isArchived && <span className="habit-archived">Archived</span>}
                   </div>
                   {h.description && <div className="habit-desc">{h.description}</div>}
+                  {h.expectedPerformance && (
+                    <div className="habit-desc">
+                      Expected performance: {h.expectedPerformance}
+                    </div>
+                  )}
 
                   <div className="habit-stats">
                     <p>Completed (total): {stats?.completedTotal ?? 0} days</p>

@@ -34,6 +34,11 @@ export function ArchivedHabitsModal({ habits, statsById, onClose, error }: Archi
                         {h.isArchived && <span className="habit-archived">Archived</span>}
                       </div>
                       {h.description && <div className="habit-desc">{h.description}</div>}
+                      {h.expectedPerformance && (
+                        <div className="habit-desc">
+                          Expected performance: {h.expectedPerformance}
+                        </div>
+                      )}
                       <div className="habit-stats">
                         <p>Completed (total): {stats?.completedTotal ?? 0} days</p>
                         <p>Longest streak: {stats?.longestStreak ?? 0}</p>

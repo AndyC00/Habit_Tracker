@@ -8,6 +8,9 @@ export function buildHabitContext(
   const lines = [
     `Name: ${habit.name}`,
     habit.description ? `Description: ${habit.description}` : null,
+    habit.expectedPerformance
+      ? `Expected performance: ${habit.expectedPerformance}`
+      : null,
     habit.isArchived ? "Archived: yes" : "Archived: no",
     stats ? `Completed total: ${stats.completedTotal}` : null,
     stats ? `Longest streak: ${stats.longestStreak}` : null,
@@ -36,6 +39,9 @@ export function buildHabitAnalysisContext({
   const habitLines = [
     `Name: ${habit.name}`,
     habit.description ? `Description: ${habit.description}` : null,
+    habit.expectedPerformance
+      ? `Expected performance: ${habit.expectedPerformance}`
+      : null,
     habit.createdUtc ? `Created: ${habit.createdUtc}` : null,
     `Archived: ${habit.isArchived ? "yes" : "no"}`,
     `Completed this month: ${stats.completedThisMonth}`,
@@ -70,6 +76,7 @@ export function buildHabitAnalysisSourceSignature(habit: Habit, stats: Stats) {
       id: habit.id,
       name: habit.name,
       description: habit.description ?? null,
+      expectedPerformance: habit.expectedPerformance ?? null,
       createdUtc: habit.createdUtc ?? null,
       isArchived: habit.isArchived,
     },

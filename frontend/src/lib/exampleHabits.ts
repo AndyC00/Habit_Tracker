@@ -86,6 +86,7 @@ export const EXAMPLE_HABIT: Habit = {
   id: EXAMPLE_HABIT_ID,
   name: "Stay Hydrated",
   description: "Track daily water intake to build a consistent hydration habit.",
+  expectedPerformance: "Drink 8 glasses of water every day.",
   colorHex: "#0d5475ff",
   iconKey: "water",
   isArchived: false,

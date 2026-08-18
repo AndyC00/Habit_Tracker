@@ -6,6 +6,7 @@ import { getIconByKey } from "../lib/habitIcons";
 export type HabitFormValues = {
   name: string;
   description: string;
+  expectedPerformance: string;
   colorHex: string;
   iconKey: string;
   isArchived: boolean;
@@ -66,6 +67,18 @@ export function HabitFormModal({
               onChange({ ...values, description: e.target.value })
             }
             placeholder="Optional description"
+          />
+        </label>
+
+        <label>
+          Expected performance
+          <input
+            type="text"
+            value={values.expectedPerformance}
+            onChange={(e) =>
+              onChange({ ...values, expectedPerformance: e.target.value })
+            }
+            placeholder="How often and how long you expected to spend on it?"
           />
         </label>
 

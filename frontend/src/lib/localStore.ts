@@ -8,6 +8,7 @@ export type Habit = {
   id: number;
   name: string;
   description?: string | null;
+  expectedPerformance?: string | null;
   colorHex?: string | null;
   iconKey?: string | null;
   isArchived: boolean;
@@ -130,6 +131,7 @@ export async function listHabits(includeArchived = false): Promise<Habit[]> {
 export async function createHabit(payload: {
   name: string;
   description?: string | null;
+  expectedPerformance?: string | null;
   colorHex?: string | null;
   iconKey?: string | null;
 }): Promise<Habit> {
@@ -140,6 +142,7 @@ export async function createHabit(payload: {
       id: db.nextHabitId++,
       name: payload.name.trim(),
       description: payload.description ?? null,
+      expectedPerformance: payload.expectedPerformance ?? null,
       colorHex: payload.colorHex ?? null,
       iconKey: payload.iconKey ?? null,
       isArchived: false,
@@ -159,6 +162,7 @@ export async function createHabit(payload: {
       id: nextId,
       name: payload.name.trim(),
       description: payload.description ?? null,
+      expectedPerformance: payload.expectedPerformance ?? null,
       colorHex: payload.colorHex ?? null,
       iconKey: payload.iconKey ?? null,
       isArchived: false,
@@ -174,6 +178,7 @@ export async function updateHabit(
   payload: {
     name: string;
     description?: string | null;
+    expectedPerformance?: string | null;
     colorHex?: string | null;
     iconKey?: string | null;
     isArchived: boolean;
@@ -185,6 +190,7 @@ export async function updateHabit(
     if (!h) throw new Error("Habit not found.");
     h.name = payload.name.trim();
     h.description = payload.description ?? null;
+    h.expectedPerformance = payload.expectedPerformance ?? null;
     h.colorHex = payload.colorHex ?? null;
     h.iconKey = payload.iconKey ?? null;
     h.isArchived = !!payload.isArchived;
@@ -203,6 +209,7 @@ export async function updateHabit(
       ...h,
       name: payload.name.trim(),
       description: payload.description ?? null,
+      expectedPerformance: payload.expectedPerformance ?? null,
       colorHex: payload.colorHex ?? null,
       iconKey: payload.iconKey ?? null,
       isArchived: !!payload.isArchived,
