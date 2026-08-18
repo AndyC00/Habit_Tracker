@@ -243,16 +243,16 @@ label {
   padding-top: 2px;
 }
 
-.habit-analysis-button {
-  border-color: rgba(167, 139, 250, 0.62);
-  background: linear-gradient(125deg, rgba(99, 102, 241, 0.34), rgba(168, 85, 247, 0.36));
-  color: #ede9fe;
+.btn.habit-analysis-button {
+  border-color: rgba(251, 146, 60, 0.82);
+  background: linear-gradient(125deg, rgba(249, 115, 22, 0.9), rgba(245, 158, 11, 0.92));
+  color: #fff7ed;
   font-weight: 800;
 }
 
-.habit-analysis-button:hover:not(:disabled) {
-  border-color: rgba(196, 181, 253, 0.9);
-  box-shadow: 0 8px 22px rgba(124, 58, 237, 0.24);
+.btn.habit-analysis-button:hover:not(:disabled) {
+  border-color: rgba(253, 186, 116, 0.95);
+  box-shadow: 0 8px 22px rgba(234, 88, 12, 0.32);
 }
 
 .habit-analysis-panel {
