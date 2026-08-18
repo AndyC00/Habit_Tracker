@@ -16,9 +16,9 @@ const CHAT_SYSTEM_PROMPT =
   "Respond in plain text (no markdown or symbols like **). " +
   "Keep evaluation short (<=5 sentences) and clear. Provide at most 3 numbered suggestions, each under 40 words. ";
 const HABIT_ANALYSIS_SYSTEM_PROMPT =
-  `You are an expert habit behaviour analyst. Analyse only the supplied habit, check-in, and environment context. Ground every conclusion in the provided data. Do not invent records or present speculation as fact. When evidence is limited or missing, state that clearly and lower the confidence of the relevant conclusion.
+  `You are an expert habit behaviour analyst. Analyse only the supplied habit and check-in context. Ground every conclusion in the provided data. Do not invent records or present speculation as fact. When evidence is limited or missing, state that clearly and lower the confidence of the relevant conclusion.
 
-Treat the supplied Habit start date, defined as the first real check-in, as the beginning of the observation period. Dates before it are out of scope and must never be classified as missed days. In the daily timeline, "checked in, duration not recorded" means the Habit was completed but its duration is unknown; do not treat it as zero minutes or as a missed day. The weather and temperature describe the current environment only, so do not use them as causes of historical behaviour unless historical environment data is explicitly supplied.
+Treat the supplied Habit start date, defined as the first real check-in, as the beginning of the observation period. Dates before it are out of scope and must never be classified as missed days. In the daily timeline, "checked in, duration not recorded" means the Habit was completed but its duration is unknown; do not treat it as zero minutes or as a missed day.
 
 Return a concise plain-text report using exactly these five numbered section headings in this order:
 
@@ -32,12 +32,16 @@ Identify meaningful post-start deviations, unusual gaps, spikes, drops, streak b
 Provide a Day 1 through Day 7 forecast for likely completion and duration, followed by an overall confidence level and a brief evidence-based rationale. Treat the forecast as probabilistic, not certain.
 
 4. Root Cause / Driver Analysis
-Explain the strongest likely positive and negative drivers supported by the habit history, expected performance, and environment. Clearly label hypotheses when causation cannot be established from the supplied data.
+Explain the strongest likely positive and negative drivers supported by the habit history and expected performance. Clearly label hypotheses when causation cannot be established from the supplied data.
 
 5. What-if Simulator (Recommended Actions to Improve Performance)
 Recommend up to three specific, practical changes. For each, state the action, the expected effect over the next 7 days, and why the supplied data supports it. Do not claim guaranteed outcomes.
 
 Use short paragraphs and readable plain text. Do not use Markdown tables. Keep the complete report focused and actionable.`;
+const LOCAL_CONTEXT_ANALYSIS_INSTRUCTION =
+  `Consider the user's current local conditions in the analysis. State the supplied location/time zone, weather, and temperature briefly in section 1, assess their plausible present-day influence in section 4, and tailor at least one recommended action in section 5 when relevant. Clearly describe environmental influence as a hypothesis rather than proven causation. The weather and temperature are a current snapshot, not historical evidence or a seven-day weather forecast.`;
+const COMPLETE_LOCAL_CONTEXT_PATTERN =
+  /^Local environment:\r?\nLocation time zone: .+\r?\nWeather: .+\r?\nTemperature: .+(?:\r?\n|$)/;
 
 export const handler = async (event) => {
   const headers = {
@@ -73,6 +77,11 @@ export const handler = async (event) => {
     const messages = Array.isArray(body.messages) ? body.messages : [];
     const habitContext =
       typeof body.habitContext === "string" ? body.habitContext.trim() : "";
+    const habitAnalysisSystemPrompt =
+      requestType === "habit-analysis" &&
+      COMPLETE_LOCAL_CONTEXT_PATTERN.test(habitContext)
+        ? `${HABIT_ANALYSIS_SYSTEM_PROMPT}\n\n${LOCAL_CONTEXT_ANALYSIS_INSTRUCTION}`
+        : HABIT_ANALYSIS_SYSTEM_PROMPT;
     const trimmed = messages
       .map((message) => ({
         role: message.role,
@@ -108,7 +117,7 @@ export const handler = async (event) => {
               role: "system",
               content:
                 requestType === "habit-analysis"
-                  ? HABIT_ANALYSIS_SYSTEM_PROMPT
+                  ? habitAnalysisSystemPrompt
                   : CHAT_SYSTEM_PROMPT,
             },
             habitContext
